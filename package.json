@@ -1,0 +1,19 @@
+{
+  "name": "shortly",
+  "version": "1.0.0",
+  "description": "Shortly — Full-Stack URL Shortener & Click Analytics",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -k -n \"backend,frontend\" -c \"blue,green\" \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
+    "dev:backend": "npm run dev --prefix backend",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "start": "node backend/src/server.js",
+    "build": "npm run build --prefix frontend",
+    "test": "npm run test --prefix backend",
+    "test:e2e": "node tests/e2e-verification.js"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
