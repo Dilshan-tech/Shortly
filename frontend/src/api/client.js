@@ -1,11 +1,9 @@
 import axios from 'axios';
+import { appConfig } from '../config/appConfig.js';
 
-// In Vite development, relative /api paths proxy automatically to the backend.
-// In production or custom builds, VITE_API_BASE can point to the backend domain.
-const baseURL = import.meta.env.VITE_API_BASE || '';
-
+// Centralized API client: uses appConfig.apiBaseUrl (defaults to '' for relative /api proxy)
 export const apiClient = axios.create({
-  baseURL,
+  baseURL: appConfig.apiBaseUrl,
   headers: {
     'Content-Type': 'application/json'
   },

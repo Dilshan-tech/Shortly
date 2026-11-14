@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '../common/Modal.jsx';
 import { Button } from '../common/Button.jsx';
+import { CopyButton } from '../common/CopyButton.jsx';
 import { Input } from '../common/Input.jsx';
 import { useToast } from '../common/ToastContext.jsx';
 import { updateUrl } from '../../api/urls.js';
 import { extractErrorMessage } from '../../api/client.js';
+import { getShortUrl } from '../../utils/formatters.js';
 
 export function EditUrlModal({ isOpen, onClose, urlItem, onSaved }) {
   const toast = useToast();
@@ -65,9 +67,27 @@ export function EditUrlModal({ isOpen, onClose, urlItem, onSaved }) {
     }
   };
 
+  const shortUrl = getShortUrl(urlItem);
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Edit Link: /${urlItem.code}`}>
       <form onSubmit={handleSubmit} className="space-y-4 pt-1">
+        <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-0.5">Short URL</span>
+            <a
+              href={shortUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono text-xs font-semibold text-brand-400 hover:text-brand-300 break-all select-all hover:underline"
+              title={`Open ${shortUrl} in a new tab`}
+            >
+              {shortUrl}
+            </a>
+          </div>
+          <CopyButton text={shortUrl} size="xs" variant="secondary" showLabel={true} />
+        </div>
+
         <Input
           label="Title / Description"
           value={formData.title}

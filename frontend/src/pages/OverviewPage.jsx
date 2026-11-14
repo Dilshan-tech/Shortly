@@ -19,6 +19,7 @@ import { ReferrerList } from '../components/analytics/ReferrerList.jsx';
 import { RecentClicksList } from '../components/analytics/RecentClicksList.jsx';
 import { QrCodeModal } from '../components/urls/QrCodeModal.jsx';
 import { Button } from '../components/common/Button.jsx';
+import { CopyButton } from '../components/common/CopyButton.jsx';
 import { Card, CardHeader } from '../components/common/Card.jsx';
 import { EmptyState } from '../components/common/EmptyState.jsx';
 import { LoadingSpinner } from '../components/common/LoadingSpinner.jsx';
@@ -31,7 +32,7 @@ import {
   getReferrers
 } from '../api/analytics.js';
 import { extractErrorMessage } from '../api/client.js';
-import { truncate } from '../utils/formatters.js';
+import { truncate, getShortUrl } from '../utils/formatters.js';
 
 export function OverviewPage() {
   const toast = useToast();
@@ -246,19 +247,37 @@ export function OverviewPage() {
                 <table className="w-full text-left text-xs text-slate-300">
                   <thead className="bg-slate-950/60 text-[10px] uppercase font-semibold text-slate-400 border-b border-slate-800">
                     <tr>
-                      <th className="py-2.5 px-3">Link Title & Alias</th>
+                      <th className="py-2.5 px-3">Link Title & Short URL</th>
                       <th className="py-2.5 px-3">Destination</th>
                       <th className="py-2.5 px-3 text-center">Total Clicks</th>
                       <th className="py-2.5 px-3 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/80">
-                    {summary.topUrls.map((url) => (
-                      <tr key={url.id} className="hover:bg-slate-800/30 transition-colors">
-                        <td className="py-3 px-3">
-                          <div className="font-semibold text-slate-100">{url.title}</div>
-                          <span className="font-mono text-xs text-brand-300">/{url.code}</span>
-                        </td>
+                    {summary.topUrls.map((url) => {
+                      const shortUrl = getShortUrl(url);
+                      return (
+                        <tr key={url.id} className="hover:bg-slate-800/30 transition-colors">
+                          <td className="py-3 px-3 min-w-[200px]">
+                            <div className="font-semibold text-slate-100">{url.title || url.code}</div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <a
+                                href={shortUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="font-mono text-xs font-bold text-brand-400 hover:text-brand-300 break-all select-all hover:underline leading-relaxed"
+                                title={`Open ${shortUrl} in a new tab`}
+                              >
+                                {shortUrl}
+                              </a>
+                              <CopyButton
+                                text={shortUrl}
+                                size="xs"
+                                variant="secondary"
+                                showLabel={true}
+                              />
+                            </div>
+                          </td>
                         <td className="py-3 px-3">
                           <span className="text-slate-400 font-mono" title={url.longUrl}>
                             {truncate(url.longUrl, 36)}
@@ -293,7 +312,8 @@ export function OverviewPage() {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    );
+                  })}
                   </tbody>
                 </table>
               </div>

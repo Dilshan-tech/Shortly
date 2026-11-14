@@ -12,16 +12,18 @@ import {
   ArrowRight,
   CheckCircle2,
   Lock,
-  Download
+  Download,
+  AlertTriangle
 } from 'lucide-react';
 import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
 import { Card, CardHeader } from '../components/common/Card.jsx';
 import { Input } from '../components/common/Input.jsx';
 import { Button } from '../components/common/Button.jsx';
+import { CopyButton } from '../components/common/CopyButton.jsx';
 import { useToast } from '../components/common/ToastContext.jsx';
 import { createUrl } from '../api/urls.js';
 import { extractErrorMessage } from '../api/client.js';
-import { copyToClipboard } from '../utils/formatters.js';
+import { copyToClipboard, getShortUrl } from '../utils/formatters.js';
 
 export function CreateLinkPage() {
   const toast = useToast();
@@ -147,14 +149,38 @@ export function CreateLinkPage() {
                 <label className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                   Short URL
                 </label>
-                <div className="flex items-center gap-2 mt-1.5 p-3 rounded-xl bg-slate-950 border border-slate-800">
-                  <span className="font-mono text-sm sm:text-base font-bold text-brand-400 truncate flex-1 select-all">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 mt-1.5 p-3 sm:p-3.5 rounded-xl bg-slate-950 border border-slate-800">
+                  <a
+                    href={createdUrl.shortUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-mono text-sm sm:text-base font-bold text-brand-400 hover:text-brand-300 break-all select-all flex-1 hover:underline leading-relaxed"
+                    title="Open short URL in a new browser tab"
+                  >
                     {createdUrl.shortUrl}
-                  </span>
-                  <Button variant="primary" size="sm" onClick={handleCopy} icon={Copy}>
-                    Copy
-                  </Button>
+                  </a>
+                  <CopyButton
+                    text={createdUrl.shortUrl}
+                    size="sm"
+                    variant="primary"
+                    showLabel={true}
+                    className="w-full sm:w-auto"
+                  />
                 </div>
+                {createdUrl.shortUrl &&
+                  (createdUrl.shortUrl.includes('localhost') || createdUrl.shortUrl.includes('127.0.0.1')) &&
+                  typeof window !== 'undefined' &&
+                  window.location.hostname !== 'localhost' &&
+                  window.location.hostname !== '127.0.0.1' && (
+                    <div className="mt-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-start gap-2.5">
+                      <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                      <div>
+                        <span className="font-semibold text-white">Mobile Warning: </span>
+                        This short link uses <code className="bg-slate-950 px-1 py-0.5 rounded text-amber-300 font-mono">localhost</code> and will not open on your phone.
+                        For VS Code port forwarding, set <code className="text-brand-300 font-mono">$env:PUBLIC_URL="https://&lt;id&gt;-5000.app.github.dev"</code> on the backend (port 5000).
+                      </div>
+                    </div>
+                  )}
               </div>
 
               <div>

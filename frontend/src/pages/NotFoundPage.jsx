@@ -1,9 +1,36 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-import { Link2, ArrowLeft } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { Link2, ArrowLeft, Loader2 } from 'lucide-react';
 import { Button } from '../components/common/Button.jsx';
+import { appConfig } from '../config/appConfig.js';
 
 export function NotFoundPage() {
+  const location = useLocation();
+  const [attemptingRedirect, setAttemptingRedirect] = useState(false);
+
+  useEffect(() => {
+    // If visitor opened a potential short code on the frontend port (e.g. /Butterfly),
+    // automatically bounce them to the backend redirect handler on port 5000.
+    const path = location.pathname.replace(/^\/+/, '');
+    const isSingleSlug = path && !path.includes('/');
+    const reserved = ['create', 'links', 'settings', 'analytics', 'api'];
+
+    if (isSingleSlug && !reserved.includes(path.toLowerCase()) && appConfig.apiBaseUrl) {
+      setAttemptingRedirect(true);
+      window.location.replace(`${appConfig.apiBaseUrl}/${path}${location.search}`);
+    }
+  }, [location]);
+
+  if (attemptingRedirect) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center text-center p-6 space-y-4">
+        <Loader2 className="w-8 h-8 text-brand-400 animate-spin" />
+        <h2 className="text-xl font-semibold text-white">Redirecting to destination...</h2>
+        <p className="text-sm text-slate-400">Opening your short link via backend service.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-[70vh] flex flex-col items-center justify-center text-center p-6 space-y-4">
       <div className="w-14 h-14 rounded-2xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-400 shadow-inner">

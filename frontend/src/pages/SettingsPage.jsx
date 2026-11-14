@@ -10,7 +10,9 @@ import {
   ExternalLink,
   RefreshCw,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  AlertTriangle,
+  Globe
 } from 'lucide-react';
 import { Card, CardHeader } from '../components/common/Card.jsx';
 import { Button } from '../components/common/Button.jsx';
@@ -89,7 +91,7 @@ export function SettingsPage() {
           <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
             <span className="text-[11px] font-semibold uppercase text-slate-400">Public Short-Link Base</span>
             <p className="text-xs font-mono text-brand-300 truncate">
-              {health?.publicUrl || 'http://localhost:5000'}
+              {health?.publicUrl || (checking ? 'Connecting...' : 'Not connected')}
             </p>
           </div>
 
@@ -99,6 +101,65 @@ export function SettingsPage() {
               {health?.uptime ? `${Math.floor(health.uptime)} seconds` : 'N/A'}
             </p>
           </div>
+        </div>
+
+        {health?.configWarnings?.length > 0 && (
+          <div className="mt-4 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 space-y-1.5">
+            <div className="flex items-center gap-2 text-amber-400 font-semibold">
+              <AlertTriangle className="w-4 h-4" />
+              <span>Configuration Alerts:</span>
+            </div>
+            <ul className="list-disc list-inside space-y-1 text-slate-300">
+              {health.configWarnings.map((w, idx) => (
+                <li key={idx} className="leading-relaxed">
+                  {w}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </Card>
+
+      {/* VS Code Port Forwarding Guide */}
+      <Card>
+        <CardHeader
+          title="VS Code Port Forwarding (Mobile & Remote Testing)"
+          subtitle="How to open Shortly on your smartphone through forwarded tunnels"
+        />
+
+        <div className="space-y-4 text-xs text-slate-300 leading-relaxed pt-1">
+          <div className="flex items-start gap-3 p-3.5 rounded-xl bg-brand-950/30 border border-brand-500/20 text-brand-200">
+            <Globe className="w-5 h-5 shrink-0 text-brand-400 mt-0.5" />
+            <div>
+              <p className="font-semibold text-white">Dual-Port Forwarding Architecture</p>
+              <p className="text-slate-300 mt-1">
+                VS Code forwards ports individually to separate HTTPS addresses:
+                one for the Vite frontend (Port 5173) and one for the Express backend (Port 5000).
+                For short link redirects to work on your phone, <strong className="text-white">PUBLIC_URL</strong> must be set to the backend forwarded URL (Port 5000), not localhost or port 5173!
+              </p>
+            </div>
+          </div>
+
+          <ol className="list-decimal list-inside space-y-3 pl-2 text-slate-300">
+            <li>
+              <strong className="text-white">Forward both ports in VS Code:</strong> Go to the <strong className="text-slate-100">Ports</strong> tab in VS Code (next to Terminal). Forward Port <code className="bg-slate-950 px-1.5 py-0.5 rounded text-brand-300 font-mono">5173</code> (Frontend) and Port <code className="bg-slate-950 px-1.5 py-0.5 rounded text-brand-300 font-mono">5000</code> (Backend).
+            </li>
+            <li>
+              <strong className="text-white">Make Port 5000 Public:</strong> Right-click Port 5000 in the Ports tab &rarr; <strong className="text-slate-100">Port Visibility</strong> &rarr; <strong className="text-emerald-400">Public</strong>. (If kept Private, your mobile phone will be blocked from accessing redirects without GitHub authentication).
+            </li>
+            <li>
+              <strong className="text-white">Copy the Port 5000 Forwarded Address:</strong> Look at the <em>Forwarded Address</em> column for Port 5000 (e.g. <code className="bg-slate-950 px-1.5 py-0.5 rounded text-emerald-300 font-mono">https://xxxx-5000.app.github.dev</code>).
+            </li>
+            <li>
+              <strong className="text-white">Set PUBLIC_URL and start Shortly:</strong>
+              <pre className="bg-slate-950 border border-slate-800 p-2.5 rounded-lg font-mono text-[11px] text-brand-300 mt-1 overflow-x-auto">
+                $env:PUBLIC_URL="https://&lt;your-id&gt;-5000.app.github.dev"; npm run dev
+              </pre>
+            </li>
+            <li>
+              <strong className="text-white">Open on Mobile:</strong> Open the <strong className="text-slate-100">Port 5173</strong> Forwarded Address in Chrome or Safari on your phone. All created links and QR codes will now use your backend tunnel and redirect seamlessly!
+            </li>
+          </ol>
         </div>
       </Card>
 
@@ -128,9 +189,9 @@ export function SettingsPage() {
               Look for IPv4 address e.g. <code className="text-emerald-300 font-mono">192.168.1.105</code>.
             </li>
             <li>
-              <strong className="text-white">Set the public short-link base:</strong> Start the backend with:
+              <strong className="text-white">Start Shortly with your LAN IP:</strong> Set <code className="text-brand-300 font-mono">PUBLIC_URL</code> and start both services:
               <pre className="bg-slate-950 border border-slate-800 p-2.5 rounded-lg font-mono text-[11px] text-brand-300 mt-1 overflow-x-auto">
-                $env:PUBLIC_URL="http://192.168.1.105:5000"; npm start --prefix backend
+                $env:PUBLIC_URL="http://&lt;YOUR_LAN_IP&gt;:5000"; npm run dev
               </pre>
             </li>
             <li>

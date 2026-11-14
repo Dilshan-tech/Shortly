@@ -11,6 +11,7 @@
     "start": "node backend/src/server.js",
     "build": "npm run build --prefix frontend",
     "test": "npm run test --prefix backend",
+    "test:urls": "node --test tests/url-display.test.js",
     "test:e2e": "node tests/e2e-verification.js"
   },
   "devDependencies": {

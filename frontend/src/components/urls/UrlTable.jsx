@@ -1,21 +1,19 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Copy,
   QrCode,
   BarChart2,
   Edit2,
   Trash2,
   ExternalLink,
   Lock,
-  Clock,
   Zap,
   Power
 } from 'lucide-react';
 import { Badge } from '../common/Badge.jsx';
 import { Button } from '../common/Button.jsx';
-import { copyToClipboard, truncate, formatDate } from '../../utils/formatters.js';
-import { useToast } from '../common/ToastContext.jsx';
+import { CopyButton } from '../common/CopyButton.jsx';
+import { truncate, formatDate, getShortUrl } from '../../utils/formatters.js';
 
 export function UrlTable({
   urls = [],
@@ -27,15 +25,6 @@ export function UrlTable({
   onDelete,
   onToggleActive
 }) {
-  const toast = useToast();
-
-  const handleCopy = async (shortUrl) => {
-    const ok = await copyToClipboard(shortUrl);
-    if (ok) {
-      toast.success('Short link copied to clipboard');
-    }
-  };
-
   const getStatusBadge = (url) => {
     const now = new Date();
     const isExpiredTime = url.expiresAt && new Date(url.expiresAt) < now;
@@ -66,9 +55,10 @@ export function UrlTable({
                 checked={allSelected}
                 onChange={onSelectAll}
                 className="rounded border-slate-700 bg-slate-900 text-brand-600 focus:ring-brand-500 cursor-pointer"
+                aria-label="Select all links"
               />
             </th>
-            <th className="py-3 px-4">Short Code & Alias</th>
+            <th className="py-3 px-4">Short URL & Title</th>
             <th className="py-3 px-4">Destination URL</th>
             <th className="py-3 px-4">Status</th>
             <th className="py-3 px-4 text-center">Clicks</th>
@@ -80,6 +70,8 @@ export function UrlTable({
         <tbody className="divide-y divide-slate-800/80">
           {urls.map((url) => {
             const isSelected = selectedIds.includes(url.id);
+            const shortUrl = getShortUrl(url);
+
             return (
               <tr
                 key={url.id}
@@ -94,40 +86,50 @@ export function UrlTable({
                     checked={isSelected}
                     onChange={() => onSelectToggle(url.id)}
                     className="rounded border-slate-700 bg-slate-900 text-brand-600 focus:ring-brand-500 cursor-pointer"
+                    aria-label={`Select link ${url.code}`}
                   />
                 </td>
 
-                {/* Short Code & Title */}
-                <td className="py-3 px-4">
-                  <div className="flex flex-col gap-0.5">
+                {/* Complete Short URL & Title */}
+                <td className="py-3 px-4 min-w-[240px] max-w-[340px]">
+                  <div className="flex flex-col gap-1.5">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono font-semibold text-white tracking-wide">
-                        /{url.code}
-                      </span>
-                      {url.isPasswordProtected && (
-                        <span title="Password Protected" className="text-amber-400">
-                          <Lock className="w-3.5 h-3.5" />
-                        </span>
-                      )}
-                      {url.isOneTimeUse && (
-                        <span title="One-time use link" className="text-brand-400">
-                          <Zap className="w-3.5 h-3.5" />
-                        </span>
-                      )}
-                      <button
-                        onClick={() => handleCopy(url.shortUrl)}
-                        className="text-slate-500 hover:text-slate-200 p-0.5 transition-colors"
-                        title="Copy short URL"
+                      <a
+                        href={shortUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono font-bold text-brand-400 hover:text-brand-300 break-all select-all hover:underline leading-relaxed"
+                        title={`Open ${shortUrl} in a new tab`}
                       >
-                        <Copy className="w-3.5 h-3.5" />
-                      </button>
+                        {shortUrl}
+                      </a>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {url.isPasswordProtected && (
+                          <span title="Password Protected" className="text-amber-400">
+                            <Lock className="w-3.5 h-3.5" />
+                          </span>
+                        )}
+                        {url.isOneTimeUse && (
+                          <span title="One-time use link" className="text-brand-400">
+                            <Zap className="w-3.5 h-3.5" />
+                          </span>
+                        )}
+                        <CopyButton
+                          text={shortUrl}
+                          size="xs"
+                          variant="secondary"
+                          showLabel={true}
+                        />
+                      </div>
                     </div>
                     {url.title ? (
-                      <span className="text-[11px] text-slate-400 truncate max-w-[200px]">
+                      <span className="text-[11px] text-slate-400 truncate max-w-[280px]">
                         {url.title}
                       </span>
                     ) : (
-                      <span className="text-[11px] text-slate-500">Standard link</span>
+                      <span className="text-[11px] font-mono text-slate-500">
+                        /{url.code}
+                      </span>
                     )}
                   </div>
                 </td>
@@ -149,6 +151,7 @@ export function UrlTable({
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-slate-500 hover:text-slate-300 shrink-0"
+                      title="Open destination in new tab"
                     >
                       <ExternalLink className="w-3 h-3" />
                     </a>

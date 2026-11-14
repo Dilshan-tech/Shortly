@@ -1,7 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Copy,
   QrCode,
   BarChart2,
   Edit2,
@@ -13,8 +12,8 @@ import {
 } from 'lucide-react';
 import { Badge } from '../common/Badge.jsx';
 import { Button } from '../common/Button.jsx';
-import { copyToClipboard, truncate, formatDate } from '../../utils/formatters.js';
-import { useToast } from '../common/ToastContext.jsx';
+import { CopyButton } from '../common/CopyButton.jsx';
+import { truncate, formatDate, getShortUrl } from '../../utils/formatters.js';
 
 export function UrlCard({
   url,
@@ -25,14 +24,7 @@ export function UrlCard({
   onDelete,
   onToggleActive
 }) {
-  const toast = useToast();
-
-  const handleCopy = async () => {
-    const ok = await copyToClipboard(url.shortUrl);
-    if (ok) {
-      toast.success('Short link copied to clipboard');
-    }
-  };
+  const shortUrl = getShortUrl(url);
 
   const getStatusBadge = () => {
     const now = new Date();
@@ -47,53 +39,82 @@ export function UrlCard({
 
   return (
     <div
-      className={`p-4 rounded-xl border transition-all ${
+      className={`p-3.5 sm:p-4 rounded-xl border transition-all ${
         isSelected
           ? 'bg-brand-950/20 border-brand-500/40 shadow-sm'
           : 'bg-slate-900/60 border-slate-800'
       }`}
     >
-      <div className="flex items-start justify-between gap-3 mb-2.5">
-        <div className="flex items-center gap-2">
+      {/* Top Header: Checkbox, Title/Alias & Status Badge */}
+      <div className="flex items-start justify-between gap-2.5 mb-2">
+        <div className="flex items-center gap-2 min-w-0">
           <input
             type="checkbox"
             checked={isSelected}
             onChange={() => onSelectToggle(url.id)}
-            className="rounded border-slate-700 bg-slate-900 text-brand-600 focus:ring-brand-500 cursor-pointer"
+            className="rounded border-slate-700 bg-slate-900 text-brand-600 focus:ring-brand-500 cursor-pointer shrink-0"
+            aria-label={`Select link ${url.code}`}
           />
-          <span className="font-mono font-bold text-white tracking-wide text-sm">
-            /{url.code}
-          </span>
-          {url.isPasswordProtected && (
-            <span title="Password Protected" className="text-amber-400">
-              <Lock className="w-3.5 h-3.5" />
-            </span>
-          )}
-          {url.isOneTimeUse && (
-            <span title="One-time use" className="text-brand-400">
-              <Zap className="w-3.5 h-3.5" />
-            </span>
-          )}
+          <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+            {url.title ? (
+              <span className="text-xs sm:text-sm font-semibold text-slate-100 truncate">
+                {url.title}
+              </span>
+            ) : (
+              <span className="text-xs font-mono text-slate-400">
+                /{url.code}
+              </span>
+            )}
+            {url.isPasswordProtected && (
+              <span title="Password Protected" className="text-amber-400 shrink-0">
+                <Lock className="w-3.5 h-3.5" />
+              </span>
+            )}
+            {url.isOneTimeUse && (
+              <span title="One-time use" className="text-brand-400 shrink-0">
+                <Zap className="w-3.5 h-3.5" />
+              </span>
+            )}
+          </div>
         </div>
-        <div>{getStatusBadge()}</div>
+        <div className="shrink-0">{getStatusBadge()}</div>
       </div>
 
-      {url.title && (
-        <p className="text-xs font-semibold text-slate-200 mb-1">{url.title}</p>
-      )}
+      {/* Complete Short URL Display Box with prominent Copy button */}
+      <div className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-slate-950/90 border border-slate-800/90 my-2.5">
+        <a
+          href={shortUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-mono text-xs sm:text-sm font-bold text-brand-400 hover:text-brand-300 break-all select-all flex-1 min-w-0 hover:underline leading-relaxed"
+          title={`Open ${shortUrl} in a new tab`}
+        >
+          {shortUrl}
+        </a>
+        <CopyButton
+          text={shortUrl}
+          size="xs"
+          variant="primary"
+          showLabel={true}
+          className="shrink-0"
+        />
+      </div>
 
+      {/* Destination URL */}
       <div className="flex items-center gap-1.5 text-xs text-slate-400 font-mono mb-3 break-all">
         <a
           href={url.longUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="truncate hover:text-brand-300"
+          title={url.longUrl}
         >
           {truncate(url.longUrl, 42)}
         </a>
         <ExternalLink className="w-3 h-3 shrink-0 text-slate-500" />
       </div>
 
+      {/* Metadata Row: Date & Clicks */}
       <div className="flex items-center justify-between text-xs pt-2.5 border-t border-slate-800/80 text-slate-400">
         <div>
           <span>{formatDate(url.createdAt)}</span>
@@ -107,14 +128,17 @@ export function UrlCard({
         </Link>
       </div>
 
+      {/* Bottom Actions: QR Code, Test Link, Active Toggle, Edit, Delete */}
       <div className="flex items-center justify-between gap-1 mt-3 pt-2.5 border-t border-slate-800/80">
         <div className="flex items-center gap-1">
-          <Button size="xs" variant="secondary" onClick={handleCopy} icon={Copy}>
-            Copy
-          </Button>
           <Button size="xs" variant="secondary" onClick={() => onOpenQr(url)} icon={QrCode}>
-            QR
+            QR Code
           </Button>
+          <a href={shortUrl} target="_blank" rel="noopener noreferrer">
+            <Button size="xs" variant="ghost" title="Open short URL in a new tab">
+              <ExternalLink className="w-3.5 h-3.5" />
+            </Button>
+          </a>
         </div>
 
         <div className="flex items-center gap-1">

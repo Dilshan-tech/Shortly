@@ -23,13 +23,14 @@ import { ReferrerList } from '../components/analytics/ReferrerList.jsx';
 import { QrCodeModal } from '../components/urls/QrCodeModal.jsx';
 import { EditUrlModal } from '../components/urls/EditUrlModal.jsx';
 import { Button } from '../components/common/Button.jsx';
+import { CopyButton } from '../components/common/CopyButton.jsx';
 import { Card, CardHeader } from '../components/common/Card.jsx';
 import { Badge } from '../components/common/Badge.jsx';
 import { LoadingSpinner } from '../components/common/LoadingSpinner.jsx';
 import { useToast } from '../components/common/ToastContext.jsx';
 import { getUrlAnalytics } from '../api/analytics.js';
 import { extractErrorMessage } from '../api/client.js';
-import { copyToClipboard, formatDate, formatTimeAgo } from '../utils/formatters.js';
+import { copyToClipboard, formatDate, formatTimeAgo, getShortUrl } from '../utils/formatters.js';
 
 export function LinkAnalyticsPage() {
   const { id } = useParams();
@@ -92,6 +93,7 @@ export function LinkAnalyticsPage() {
   }
 
   const { url, summary, timeseries, devices, browsers, referrers, recentClicks } = analytics;
+  const shortUrl = getShortUrl(url);
 
   return (
     <div className="space-y-6">
@@ -104,12 +106,21 @@ export function LinkAnalyticsPage() {
             </Button>
           </Link>
           <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
-              <span>/{url.code}</span>
-              {url.title && (
-                <span className="text-sm font-normal text-slate-400">({url.title})</span>
-              )}
-            </h2>
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <a
+                href={shortUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-lg sm:text-2xl font-bold font-mono text-white hover:text-brand-300 break-all hover:underline"
+                title={`Open ${shortUrl} in a new tab`}
+              >
+                {shortUrl}
+              </a>
+              <CopyButton text={shortUrl} size="xs" variant="secondary" showLabel={true} />
+            </div>
+            {url.title && (
+              <p className="text-xs sm:text-sm text-slate-300 mt-1 font-medium">{url.title}</p>
+            )}
             <p className="text-xs text-slate-400 mt-0.5">
               Created {formatDate(url.createdAt)}
             </p>
@@ -197,13 +208,17 @@ export function LinkAnalyticsPage() {
             </div>
           </div>
 
-          <div className="shrink-0 flex items-center gap-2 bg-slate-950 p-2.5 rounded-xl border border-slate-800">
-            <span className="font-mono text-xs text-brand-400 font-semibold select-all">
-              {url.shortUrl}
-            </span>
-            <Button size="xs" variant="ghost" onClick={handleCopy} title="Copy short link">
-              <Copy className="w-3.5 h-3.5" />
-            </Button>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+            <a
+              href={shortUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono text-xs sm:text-sm text-brand-400 hover:text-brand-300 font-semibold select-all break-all hover:underline leading-relaxed flex-1"
+              title={`Open ${shortUrl} in a new tab`}
+            >
+              {shortUrl}
+            </a>
+            <CopyButton text={shortUrl} size="xs" variant="primary" showLabel={true} />
           </div>
         </div>
       </Card>

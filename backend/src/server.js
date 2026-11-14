@@ -20,12 +20,21 @@ async function bootstrap() {
 ║                   SHORTLY URL SHORTENER                   ║
 ║                     Backend Running                       ║
 ╠═══════════════════════════════════════════════════════════╣
+║  • Host Interface:  ${config.host.padEnd(38)}║
 ║  • Port:            ${config.port.toString().padEnd(38)}║
-║  • Mode:            ${config.env.padEnd(38)}║
-║  • Public Link Base:${config.publicUrl.padEnd(38)}║
-║  • Data Storage:    ${config.dataDir.slice(-38).padEnd(38)}║
+║  • Environment:     ${config.env.padEnd(38)}║
+║  • Public URL Base: ${config.publicUrl.padEnd(38)}║
+║  • Storage Dir:     ${config.dataDir.slice(-38).padEnd(38)}║
 ╚═══════════════════════════════════════════════════════════╝
       `);
+      if (config.isDev && (config.publicUrl.includes('localhost') || config.publicUrl.includes('127.0.0.1'))) {
+        console.log(`💡 [Mobile & External Testing Tips]:`);
+        console.log(`   1. VS Code Port Forwarding (Recommended):`);
+        console.log(`      Forward port 5000 in VS Code (Right-click port 5000 -> Port Visibility -> Public)`);
+        console.log(`      Run: $env:PUBLIC_URL="https://<your-code>-5000.app.github.dev"; npm run dev`);
+        console.log(`   2. Wi-Fi LAN Testing:`);
+        console.log(`      Run: $env:PUBLIC_URL="http://<YOUR_LAN_IP>:${config.port}"; npm run dev\n`);
+      }
     });
 
     // Graceful shutdown

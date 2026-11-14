@@ -3,8 +3,9 @@ import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
 import { Download, Copy, ExternalLink, Check } from 'lucide-react';
 import { Modal } from '../common/Modal.jsx';
 import { Button } from '../common/Button.jsx';
+import { CopyButton } from '../common/CopyButton.jsx';
 import { useToast } from '../common/ToastContext.jsx';
-import { copyToClipboard } from '../../utils/formatters.js';
+import { copyToClipboard, getShortUrl } from '../../utils/formatters.js';
 
 export function QrCodeModal({ isOpen, onClose, urlItem }) {
   const toast = useToast();
@@ -12,7 +13,7 @@ export function QrCodeModal({ isOpen, onClose, urlItem }) {
 
   if (!urlItem) return null;
 
-  const shortUrl = urlItem.shortUrl;
+  const shortUrl = getShortUrl(urlItem);
 
   const handleCopy = async () => {
     const ok = await copyToClipboard(shortUrl);
@@ -86,12 +87,18 @@ export function QrCodeModal({ isOpen, onClose, urlItem }) {
 
         {/* Short URL Display & Copy */}
         <div className="w-full">
-          <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs">
-            <span className="font-mono text-brand-300 truncate select-all">{shortUrl}</span>
-            <div className="flex items-center gap-1 shrink-0">
-              <Button size="xs" variant="ghost" onClick={handleCopy} title="Copy Short URL">
-                <Copy className="w-3.5 h-3.5" />
-              </Button>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs">
+            <a
+              href={shortUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono text-brand-300 hover:text-brand-200 hover:underline break-all select-all flex-1 leading-relaxed"
+              title={`Open ${shortUrl} in a new tab`}
+            >
+              {shortUrl}
+            </a>
+            <div className="flex items-center gap-1.5 shrink-0 justify-end">
+              <CopyButton text={shortUrl} size="xs" variant="secondary" showLabel={true} />
               <a href={shortUrl} target="_blank" rel="noopener noreferrer">
                 <Button size="xs" variant="ghost" title="Open in new tab">
                   <ExternalLink className="w-3.5 h-3.5" />
