@@ -11,8 +11,13 @@
     "start": "node backend/src/server.js",
     "build": "npm run build --prefix frontend",
     "test": "npm run test --prefix backend",
+    "test:auth": "npm run test:auth --prefix backend",
     "test:urls": "node --test tests/url-display.test.js",
-    "test:e2e": "node tests/e2e-verification.js"
+    "test:mongo": "npm run test:mongo --prefix backend",
+    "test:analytics": "npm run test:analytics --prefix backend",
+    "test:e2e": "node tests/e2e-verification.js",
+    "verify:mongo": "npm run verify:mongo --prefix backend",
+    "migrate": "npm run migrate --prefix backend"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

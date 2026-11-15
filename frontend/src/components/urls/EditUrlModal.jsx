@@ -72,14 +72,14 @@ export function EditUrlModal({ isOpen, onClose, urlItem, onSaved }) {
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Edit Link: /${urlItem.code}`}>
       <form onSubmit={handleSubmit} className="space-y-4 pt-1">
-        <div className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-between gap-2">
+        <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-0.5">Short URL</span>
+            <span className="text-[10px] uppercase font-semibold text-slate-500 dark:text-slate-400 block mb-0.5">Short URL</span>
             <a
               href={shortUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-mono text-xs font-semibold text-brand-400 hover:text-brand-300 break-all select-all hover:underline"
+              className="font-mono text-xs font-semibold text-brand-600 dark:text-brand-400 hover:text-brand-500 dark:hover:text-brand-300 break-all select-all hover:underline"
               title={`Open ${shortUrl} in a new tab`}
             >
               {shortUrl}
@@ -124,17 +124,17 @@ export function EditUrlModal({ isOpen, onClose, urlItem, onSaved }) {
         </div>
 
         {/* Password management */}
-        <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2.5">
-          <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wide">
+        <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-2.5">
+          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
             Password Protection
           </label>
           {urlItem.isPasswordProtected && (
-            <label className="flex items-center gap-2 text-xs text-amber-300 mb-2 cursor-pointer">
+            <label className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-300 mb-2 cursor-pointer select-none">
               <input
                 type="checkbox"
                 checked={formData.removePassword}
                 onChange={(e) => setFormData({ ...formData, removePassword: e.target.checked })}
-                className="rounded border-slate-700 bg-slate-900 text-brand-600 focus:ring-brand-500"
+                className="rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-brand-600 focus:ring-brand-500"
               />
               Remove current password protection
             </label>
@@ -152,24 +152,21 @@ export function EditUrlModal({ isOpen, onClose, urlItem, onSaved }) {
         </div>
 
         {/* Active Toggle */}
-        <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-950/60 border border-slate-800">
-          <div>
-            <p className="text-xs font-semibold text-slate-200">Active Status</p>
-            <p className="text-[11px] text-slate-400">Temporarily disable or enable this link</p>
-          </div>
-          <label className="relative inline-flex items-center cursor-pointer">
+        <div className="pt-1">
+          <label className="flex items-center gap-2.5 text-xs text-slate-700 dark:text-slate-300 cursor-pointer select-none">
             <input
               type="checkbox"
               checked={formData.isActive}
               onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
-              className="sr-only peer"
+              className="rounded border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-brand-600 focus:ring-brand-500 w-4 h-4 cursor-pointer"
             />
-            <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-600"></div>
+            <span className="font-semibold text-slate-900 dark:text-white">Active Link</span>
           </label>
         </div>
 
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
-          <Button variant="ghost" onClick={onClose}>
+        {/* Modal footer actions */}
+        <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+          <Button type="button" variant="ghost" onClick={onClose}>
             Cancel
           </Button>
           <Button type="submit" variant="primary" isLoading={loading}>

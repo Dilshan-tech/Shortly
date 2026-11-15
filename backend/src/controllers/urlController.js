@@ -3,7 +3,11 @@ import { urlService } from '../services/urlService.js';
 export const urlController = {
   async create(req, res, next) {
     try {
-      const result = await urlService.createShortUrl(req.body);
+      const ownerId = req.user?.id || req.body.ownerId || null;
+      const result = await urlService.createShortUrl({
+        ...req.body,
+        ownerId
+      });
       res.status(201).json({
         success: true,
         data: result
@@ -16,13 +20,16 @@ export const urlController = {
   async list(req, res, next) {
     try {
       const { search, status, sortBy, sortOrder, page, limit } = req.query;
+      const ownerId = req.user ? req.user.id : (req.query.ownerId || null);
+
       const result = await urlService.getAllUrls({
         search,
         status,
         sortBy,
         sortOrder,
         page: page ? parseInt(page, 10) : 1,
-        limit: limit ? parseInt(limit, 10) : 20
+        limit: limit ? parseInt(limit, 10) : 20,
+        ownerId
       });
       res.json({
         success: true,
@@ -44,6 +51,18 @@ export const urlController = {
           error: 'URL record not found'
         });
       }
+
+      // Check user ownership if URL is private/owned
+      if (result.ownerId || result.userId) {
+        const linkOwner = String(result.ownerId || result.userId);
+        if (!req.user || (req.user.id !== linkOwner && req.user.role !== 'admin')) {
+          return res.status(403).json({
+            success: false,
+            error: 'You do not have permission to view this URL.'
+          });
+        }
+      }
+
       res.json({
         success: true,
         data: result
@@ -75,7 +94,7 @@ export const urlController = {
   async update(req, res, next) {
     try {
       const { id } = req.params;
-      const result = await urlService.updateUrl(id, req.body);
+      const result = await urlService.updateUrl(id, req.body, req.user);
       res.json({
         success: true,
         data: result
@@ -88,7 +107,7 @@ export const urlController = {
   async remove(req, res, next) {
     try {
       const { id } = req.params;
-      await urlService.deleteUrl(id);
+      await urlService.deleteUrl(id, req.user);
       res.json({
         success: true,
         message: 'URL deleted successfully'

@@ -3,34 +3,104 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --bg-main: #fafafa;
+    --card-bg: #ffffff;
+    --border-color: rgba(0, 0, 0, 0.08);
+    --text-primary: #09090b;
+    --text-secondary: #52525b;
+    --text-muted: #71717a;
+  }
+
+  .dark {
+    --bg-main: #09090b;
+    --card-bg: #111114;
+    --border-color: rgba(255, 255, 255, 0.08);
+    --text-primary: #fafafa;
+    --text-secondary: #a1a1aa;
+    --text-muted: #71717a;
+  }
+
+  * {
+    border-color: var(--border-color);
+  }
+
+  html {
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
   body {
-    @apply bg-[#0b0f19] text-slate-100 min-h-screen overflow-x-hidden;
+    @apply bg-[#fafafa] text-zinc-900 dark:bg-[#09090b] dark:text-zinc-100 min-h-screen overflow-x-hidden font-sans transition-colors duration-150 antialiased selection:bg-brand-500 selection:text-white;
+    background-image: radial-gradient(rgba(0, 0, 0, 0.06) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  .dark body {
+    background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  /* Accessible focus rings */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-white dark:ring-offset-[#09090b];
   }
 }
 
 /* Custom sleek scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: #d4d4d8;
   border-radius: 9999px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
 }
 
-/* Glassmorphism helpers */
-.glass-panel {
-  background: rgba(30, 41, 59, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+::-webkit-scrollbar-thumb:hover {
+  background: #a1a1aa;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+/* Premium SaaS Cards */
+.saas-card {
+  @apply bg-white dark:bg-[#111114]/90 border border-zinc-200/90 dark:border-white/[0.08] rounded-2xl shadow-card dark:shadow-card-dark backdrop-blur-xl transition-all duration-200;
+}
+
+.saas-card-hover {
+  @apply hover:border-zinc-300 dark:hover:border-white/[0.15] hover:shadow-card-hover dark:hover:shadow-card-dark-hover;
+}
+
+.saas-input {
+  @apply bg-zinc-50/80 dark:bg-[#0c0c0e] border border-zinc-200 dark:border-white/[0.09] text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 text-sm rounded-xl py-2 px-3.5 transition-all focus:border-brand-500 dark:focus:border-brand-500 focus:ring-1 focus:ring-brand-500 font-medium;
+}
+
+/* Luminous Ambient Spotlight Aurora */
+.ambient-glow {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1200px;
+  height: 480px;
+  background: radial-gradient(ellipse 70% 50% at 50% -10%, rgba(99, 91, 255, 0.18) 0%, rgba(139, 92, 246, 0.08) 40%, transparent 75%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.dark .ambient-glow {
+  background: radial-gradient(ellipse 70% 50% at 50% -10%, rgba(99, 91, 255, 0.22) 0%, rgba(139, 92, 246, 0.1) 45%, transparent 75%);
 }

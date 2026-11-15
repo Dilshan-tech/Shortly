@@ -8,72 +8,111 @@ export class AnalyticsService {
     this.urlRepo = urlRepo;
   }
 
-  async getOverallSummary() {
+  /**
+   * Helper to verify user ownership of a short link
+   */
+  _verifyOwnership(url, ownerId = null) {
+    if (!url) return;
+    if (url.ownerId || url.userId) {
+      const linkOwner = url.ownerId || url.userId;
+      if (!ownerId) {
+        const error = new Error('Authentication required to access analytics for this link.');
+        error.statusCode = 401;
+        throw error;
+      }
+      if (String(linkOwner) !== String(ownerId)) {
+        const error = new Error('You do not have permission to view analytics for this link.');
+        error.statusCode = 403;
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * Parse range parameters consistently: accepts range ('24h', '7d', '30d', '90d', 'custom')
+   * or legacy 'days' query (e.g. 7, 30).
+   */
+  _normalizeRange({ range = null, days = null, startDate = null, endDate = null } = {}) {
+    let effectiveRange = range;
+    if (!effectiveRange && days) {
+      effectiveRange = `${days}d`;
+    }
+    if (!effectiveRange && (startDate || endDate)) {
+      effectiveRange = 'custom';
+    }
+    if (!effectiveRange) {
+      effectiveRange = '30d';
+    }
+    return {
+      range: effectiveRange,
+      startDate,
+      endDate
+    };
+  }
+
+  async getOverallSummary({
+    range = '30d',
+    days = null,
+    startDate = null,
+    endDate = null,
+    includeBots = false,
+    ownerId = null
+  } = {}) {
     await this.urlRepo.init();
     await this.clickRepo.init();
 
-    const urls = Array.from(this.urlRepo.urlsById.values());
-    const totalLinks = urls.length;
-    const now = new Date();
+    const rangeConfig = this._normalizeRange({ range, days, startDate, endDate });
 
-    const activeLinks = urls.filter((u) => {
-      if (!u.isActive) return false;
-      if (u.expiresAt && new Date(u.expiresAt) < now) return false;
-      if (u.clickLimit && u.clicks >= u.clickLimit) return false;
-      return true;
-    }).length;
+    // Link counts (scoped to owner if specified)
+    const [totalLinks, activeLinks, clickStats, topPerforming, recentClicks] = await Promise.all([
+      this.urlRepo.countAll(ownerId ? { ownerId } : {}),
+      this.urlRepo.countActive(ownerId ? { ownerId } : {}),
+      this.clickRepo.getSummary(null, { ...rangeConfig, includeBots }),
+      this.urlRepo.findTopPerforming(6, ownerId ? { ownerId } : {}),
+      this.clickRepo.findRecent(12, { includeBots })
+    ]);
 
-    const clickStats = await this.clickRepo.getSummary();
-
-    // Top 5 performing links
-    const topUrls = [...urls]
-      .sort((a, b) => (b.clicks || 0) - (a.clicks || 0))
-      .slice(0, 5)
-      .map((u) => ({
-        id: u.id,
-        code: u.code,
-        title: u.title || u.code,
-        longUrl: u.longUrl,
-        shortUrl: `${config.publicUrl}/${u.code}`,
-        clicks: u.clicks || 0,
-        isActive: u.isActive
-      }));
-
-    // Recent 10 clicks
-    const recentClicks = await this.clickRepo.findRecent(10);
+    const topUrls = topPerforming.map((u) => ({
+      id: u.id,
+      code: u.code,
+      title: u.title || u.code,
+      longUrl: u.longUrl,
+      shortUrl: `${config.publicUrl}/${u.code}`,
+      clicks: u.clicks || 0,
+      isActive: u.isActive
+    }));
 
     return {
       totalLinks,
       activeLinks,
       totalClicks: clickStats.totalClicks,
+      periodClicks: clickStats.periodClicks,
+      previousClicks: clickStats.previousClicks,
       clicksToday: clickStats.clicksToday,
       uniqueVisitors: clickStats.uniqueVisitors,
+      previousUniques: clickStats.previousUniques,
+      clicksChangePct: clickStats.clicksChangePct,
+      uniquesChangePct: clickStats.uniquesChangePct,
+      dateRange: clickStats.dateRange,
       topUrls,
       recentClicks
     };
   }
 
-  async getTimeseries({ days = 7, urlId = null } = {}) {
-    return this.clickRepo.getTimeseries({ days, urlId });
-  }
+  async getUrlAnalytics(
+    urlId,
+    {
+      range = '30d',
+      days = null,
+      startDate = null,
+      endDate = null,
+      includeBots = false,
+      ownerId = null
+    } = {}
+  ) {
+    await this.urlRepo.init();
+    await this.clickRepo.init();
 
-  async getDevices({ urlId = null } = {}) {
-    return this.clickRepo.getDeviceBreakdown({ urlId });
-  }
-
-  async getBrowsers({ urlId = null } = {}) {
-    return this.clickRepo.getBrowserBreakdown({ urlId });
-  }
-
-  async getOs({ urlId = null } = {}) {
-    return this.clickRepo.getOsBreakdown({ urlId });
-  }
-
-  async getReferrers({ urlId = null } = {}) {
-    return this.clickRepo.getReferrerBreakdown({ urlId });
-  }
-
-  async getUrlAnalytics(urlId, { days = 30 } = {}) {
     const url = await this.urlRepo.findById(urlId);
     if (!url) {
       const error = new Error('URL not found');
@@ -81,13 +120,28 @@ export class AnalyticsService {
       throw error;
     }
 
-    const summary = await this.clickRepo.getSummary(urlId);
-    const timeseries = await this.clickRepo.getTimeseries({ days, urlId });
-    const devices = await this.clickRepo.getDeviceBreakdown({ urlId });
-    const browsers = await this.clickRepo.getBrowserBreakdown({ urlId });
-    const os = await this.clickRepo.getOsBreakdown({ urlId });
-    const referrers = await this.clickRepo.getReferrerBreakdown({ urlId });
-    const recentClicks = (await this.clickRepo.findByUrlId(urlId, { limit: 20 })).items;
+    this._verifyOwnership(url, ownerId);
+    const rangeConfig = this._normalizeRange({ range, days, startDate, endDate });
+
+    const [
+      summary,
+      timeseries,
+      devices,
+      browsers,
+      os,
+      referrers,
+      countries,
+      recentClicksRes
+    ] = await Promise.all([
+      this.clickRepo.getSummary(urlId, { ...rangeConfig, includeBots }),
+      this.clickRepo.getTimeseries({ urlId, ...rangeConfig, includeBots }),
+      this.clickRepo.getDeviceBreakdown({ urlId, ...rangeConfig, includeBots }),
+      this.clickRepo.getBrowserBreakdown({ urlId, ...rangeConfig, includeBots }),
+      this.clickRepo.getOsBreakdown({ urlId, ...rangeConfig, includeBots }),
+      this.clickRepo.getReferrerBreakdown({ urlId, ...rangeConfig, includeBots }),
+      this.clickRepo.getCountryBreakdown({ urlId, ...rangeConfig, includeBots }),
+      this.clickRepo.findClicks({ urlId, limit: 25, page: 1, ...rangeConfig, includeBots })
+    ]);
 
     const { passwordHash, ...safeUrl } = url;
 
@@ -98,16 +152,81 @@ export class AnalyticsService {
       },
       summary: {
         totalClicks: summary.totalClicks,
+        periodClicks: summary.periodClicks,
+        previousClicks: summary.previousClicks,
         clicksToday: summary.clicksToday,
-        uniqueVisitors: summary.uniqueVisitors
+        uniqueVisitors: summary.uniqueVisitors,
+        previousUniques: summary.previousUniques,
+        clicksChangePct: summary.clicksChangePct,
+        uniquesChangePct: summary.uniquesChangePct,
+        dateRange: summary.dateRange
       },
       timeseries,
       devices,
       browsers,
       os,
       referrers,
-      recentClicks
+      countries,
+      recentClicks: recentClicksRes.items,
+      pagination: recentClicksRes.pagination
     };
+  }
+
+  async getTimeseries({ range = '7d', days = null, startDate = null, endDate = null, urlId = null, includeBots = false } = {}) {
+    const rangeConfig = this._normalizeRange({ range, days, startDate, endDate });
+    return this.clickRepo.getTimeseries({ urlId, ...rangeConfig, includeBots });
+  }
+
+  async getDevices({ range = '30d', days = null, startDate = null, endDate = null, urlId = null, includeBots = false } = {}) {
+    const rangeConfig = this._normalizeRange({ range, days, startDate, endDate });
+    return this.clickRepo.getDeviceBreakdown({ urlId, ...rangeConfig, includeBots });
+  }
+
+  async getBrowsers({ range = '30d', days = null, startDate = null, endDate = null, urlId = null, includeBots = false } = {}) {
+    const rangeConfig = this._normalizeRange({ range, days, startDate, endDate });
+    return this.clickRepo.getBrowserBreakdown({ urlId, ...rangeConfig, includeBots });
+  }
+
+  async getOs({ range = '30d', days = null, startDate = null, endDate = null, urlId = null, includeBots = false } = {}) {
+    const rangeConfig = this._normalizeRange({ range, days, startDate, endDate });
+    return this.clickRepo.getOsBreakdown({ urlId, ...rangeConfig, includeBots });
+  }
+
+  async getReferrers({ range = '30d', days = null, startDate = null, endDate = null, urlId = null, includeBots = false } = {}) {
+    const rangeConfig = this._normalizeRange({ range, days, startDate, endDate });
+    return this.clickRepo.getReferrerBreakdown({ urlId, ...rangeConfig, includeBots });
+  }
+
+  async getCountries({ range = '30d', days = null, startDate = null, endDate = null, urlId = null, includeBots = false } = {}) {
+    const rangeConfig = this._normalizeRange({ range, days, startDate, endDate });
+    return this.clickRepo.getCountryBreakdown({ urlId, ...rangeConfig, includeBots });
+  }
+
+  async getClicks(params = {}) {
+    const { urlId, ownerId } = params;
+    if (urlId) {
+      const url = await this.urlRepo.findById(urlId);
+      if (!url) {
+        const error = new Error('URL not found');
+        error.statusCode = 404;
+        throw error;
+      }
+      this._verifyOwnership(url, ownerId);
+    }
+    return this.clickRepo.findClicks(params);
+  }
+
+  async exportCsv({ urlId = null, range = '30d', startDate = null, endDate = null, includeBots = false, ownerId = null } = {}) {
+    if (urlId) {
+      const url = await this.urlRepo.findById(urlId);
+      if (!url) {
+        const error = new Error('URL not found');
+        error.statusCode = 404;
+        throw error;
+      }
+      this._verifyOwnership(url, ownerId);
+    }
+    return this.clickRepo.exportCsv({ urlId, range, startDate, endDate, includeBots });
   }
 }
 

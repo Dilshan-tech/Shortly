@@ -48,3 +48,17 @@ export const redirectLimiter = rateLimit({
     error: 'Redirect rate limit exceeded. Please wait a few seconds.'
   }
 });
+
+// Authentication Limiter (prevent credential brute-force and account creation spam)
+export const authLimiter = rateLimit({
+  windowMs: config.authRateLimitWindowMs || 15 * 60 * 1000,
+  max: config.authRateLimitMax || 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: false,
+  skip: () => process.env.NODE_ENV === 'test',
+  message: {
+    success: false,
+    error: 'Too many authentication attempts from this IP. Please try again after 15 minutes.'
+  }
+});

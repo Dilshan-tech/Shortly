@@ -26,6 +26,46 @@ export const updateUrlSchema = z.object({
   password: z.string().min(4).max(64).optional().nullable().or(z.literal(''))
 });
 
+// Authentication & Account Schemas
+export const registerSchema = z.object({
+  email: z.string().email('Please enter a valid email address'),
+  password: z
+    .string()
+    .min(8, 'Password must be at least 8 characters long')
+    .max(128, 'Password cannot exceed 128 characters')
+    .regex(/[A-Za-z]/, 'Password must contain at least one letter')
+    .regex(/[0-9]/, 'Password must contain at least one number'),
+  name: z.string().max(100, 'Name cannot exceed 100 characters').optional().default('')
+});
+
+export const loginSchema = z.object({
+  email: z.string().min(1, 'Email is required'),
+  password: z.string().min(1, 'Password is required')
+});
+
+export const updateProfileSchema = z.object({
+  name: z.string().min(1, 'Name cannot be empty').max(100, 'Name cannot exceed 100 characters')
+});
+
+export const updateEmailSchema = z.object({
+  newEmail: z.string().email('Please enter a valid email address'),
+  currentPassword: z.string().min(1, 'Current password is required to change email')
+});
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Current password is required'),
+  newPassword: z
+    .string()
+    .min(8, 'New password must be at least 8 characters long')
+    .max(128, 'New password cannot exceed 128 characters')
+    .regex(/[A-Za-z]/, 'New password must contain at least one letter')
+    .regex(/[0-9]/, 'New password must contain at least one number')
+});
+
+export const deleteAccountSchema = z.object({
+  currentPassword: z.string().min(1, 'Password confirmation is required to delete your account')
+});
+
 export function validateBody(schema) {
   return (req, res, next) => {
     try {

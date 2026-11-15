@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Button } from './Button.jsx';
 
 export function EmptyState({
@@ -11,19 +12,21 @@ export function EmptyState({
   actionLink
 }) {
   return (
-    <div className="flex flex-col items-center justify-center text-center p-12 border border-dashed border-slate-800 rounded-2xl bg-slate-900/40">
-      <div className="w-12 h-12 rounded-xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-center text-brand-400 mb-4 shadow-inner">
-        <Icon className="w-6 h-6" />
+    <div className="flex flex-col items-center justify-center text-center p-10 sm:p-16 border border-dashed border-slate-300/80 dark:border-white/[0.1] rounded-3xl bg-white/40 dark:bg-white/[0.02] backdrop-blur-md relative overflow-hidden shadow-xs">
+      <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-brand-600 via-brand-500 to-indigo-400 flex items-center justify-center text-white mb-4 shadow-lg shadow-brand-500/25">
+        <Icon className="w-7 h-7" />
       </div>
-      <h3 className="text-base font-semibold text-slate-100 mb-1">{title}</h3>
-      <p className="text-sm text-slate-400 max-w-sm mb-6">{description}</p>
+      <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mb-1.5 tracking-tight">{title}</h3>
+      <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-sm mb-6 leading-relaxed">
+        {description}
+      </p>
       {actionLabel && (
         actionLink ? (
-          <a href={actionLink}>
-            <Button variant="primary">{actionLabel}</Button>
-          </a>
+          <Link to={actionLink}>
+            <Button variant="primary" size="md">{actionLabel}</Button>
+          </Link>
         ) : (
-          <Button variant="primary" onClick={onAction}>
+          <Button variant="primary" size="md" onClick={onAction}>
             {actionLabel}
           </Button>
         )

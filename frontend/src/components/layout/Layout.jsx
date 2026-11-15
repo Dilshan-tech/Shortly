@@ -29,16 +29,19 @@ export function Layout() {
   }, []);
 
   return (
-    <div className="flex min-h-screen bg-[#0b0f19] text-slate-100 font-sans">
+    <div className="relative flex min-h-screen bg-slate-50 text-slate-900 dark:bg-[#07080c] dark:text-slate-100 font-sans transition-colors duration-150 overflow-hidden">
+      {/* Ambient Top Glow Spotlight */}
+      <div className="ambient-glow" />
+
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         backendHealthy={backendHealthy}
       />
 
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 relative z-10">
         <Navbar onMenuClick={() => setSidebarOpen(true)} />
-        <main className="flex-1 p-4 sm:p-8 max-w-7xl w-full mx-auto animate-in fade-in duration-150">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto animate-in fade-in duration-150">
           <Outlet />
         </main>
       </div>

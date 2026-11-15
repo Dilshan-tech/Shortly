@@ -1,27 +1,33 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
+import mongoose from 'mongoose';
 import { createApp } from '../app.js';
+import { config } from '../config/env.js';
+import { connectDatabase, disconnectDatabase } from '../config/database.js';
 import { urlRepository } from '../repositories/urlRepository.js';
 import { clickRepository } from '../repositories/clickRepository.js';
-import { UrlRepository } from '../repositories/urlRepository.js';
+import { Url } from '../models/Url.js';
+import { Click } from '../models/Click.js';
 
 describe('Shortly Backend Test Suite', () => {
   let app;
 
   beforeAll(async () => {
+    const testMongoUri = (config.mongodbUri || '').replace(/\/shortly(\?|$)/, '/shortly_test$1');
+    await connectDatabase(testMongoUri);
+    await Url.deleteMany({});
+    await Click.deleteMany({});
     await urlRepository.init();
     await clickRepository.init();
-    urlRepository.urlsById.clear();
-    urlRepository.urlsByCode.clear();
-    clickRepository.clicks = [];
-    await urlRepository._persist();
-    await clickRepository.storage.write([]);
     app = createApp();
   });
 
   afterAll(async () => {
-    await urlRepository.flush();
-    await clickRepository.flush();
+    if (mongoose.connection.readyState === 1 && mongoose.connection.name === 'shortly_test') {
+      await Url.deleteMany({});
+      await Click.deleteMany({});
+      await disconnectDatabase();
+    }
   });
 
   describe('1. Health Check', () => {
@@ -315,14 +321,8 @@ describe('Shortly Backend Test Suite', () => {
         });
       expect(res.status).toBe(201);
 
-      // Flush writes to disk
-      await urlRepository.flush();
-
-      // Read directly using a fresh instance of UrlRepository pointing to same directory
-      const freshRepo = new UrlRepository(urlRepository.storage.dir);
-      await freshRepo.init();
-
-      const found = await freshRepo.findByCode(uniqueCode);
+      // Query MongoDB to verify immediate persistence
+      const found = await urlRepository.findByCode(uniqueCode);
       expect(found).not.toBeNull();
       expect(found.longUrl).toBe('https://persist-test.com/');
     });

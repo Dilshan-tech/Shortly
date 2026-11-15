@@ -1,6 +1,6 @@
 import React, { useRef } from 'react';
 import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react';
-import { Download, Copy, ExternalLink, Check } from 'lucide-react';
+import { Download, ExternalLink } from 'lucide-react';
 import { Modal } from '../common/Modal.jsx';
 import { Button } from '../common/Button.jsx';
 import { CopyButton } from '../common/CopyButton.jsx';
@@ -64,8 +64,8 @@ export function QrCodeModal({ isOpen, onClose, urlItem }) {
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="QR Code Preview">
       <div className="flex flex-col items-center space-y-6 pt-2">
-        {/* QR Code Container with High Contrast & Sleek White Border */}
-        <div className="p-4 bg-white rounded-2xl shadow-xl flex items-center justify-center">
+        {/* QR Code Container with High Contrast & Sleek Border */}
+        <div className="p-4 bg-white rounded-2xl shadow-lg border border-slate-100 flex items-center justify-center">
           <QRCodeSVG
             id="qr-svg-preview"
             value={shortUrl}
@@ -87,12 +87,12 @@ export function QrCodeModal({ isOpen, onClose, urlItem }) {
 
         {/* Short URL Display & Copy */}
         <div className="w-full">
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-xs">
             <a
               href={shortUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-mono text-brand-300 hover:text-brand-200 hover:underline break-all select-all flex-1 leading-relaxed"
+              className="font-mono text-brand-600 dark:text-brand-300 hover:text-brand-500 dark:hover:text-brand-200 hover:underline break-all select-all flex-1 leading-relaxed"
               title={`Open ${shortUrl} in a new tab`}
             >
               {shortUrl}
@@ -106,8 +106,8 @@ export function QrCodeModal({ isOpen, onClose, urlItem }) {
               </a>
             </div>
           </div>
-          <p className="text-[11px] text-slate-400 text-center mt-2">
-            Target: <span className="truncate max-w-[260px] inline-block align-bottom">{urlItem.longUrl}</span>
+          <p className="text-[11px] text-slate-500 dark:text-slate-400 text-center mt-2">
+            Target: <span className="truncate max-w-[260px] inline-block align-bottom font-mono">{urlItem.longUrl}</span>
           </p>
         </div>
 

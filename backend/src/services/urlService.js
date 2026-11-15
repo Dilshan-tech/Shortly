@@ -10,7 +10,10 @@ import { config } from '../config/env.js';
 // In-memory verification tokens cache for password-protected links: token -> { code, expiresAt }
 const verificationTokens = new Map();
 
-// Periodic cleanup of expired verification tokens
+// In-memory retry deduplication cache to prevent duplicate click counting from rapid retries
+const recentClicksCache = new Map();
+
+// Periodic cleanup of expired verification tokens and retry cache
 setInterval(() => {
   const now = Date.now();
   for (const [token, data] of verificationTokens.entries()) {
@@ -18,12 +21,38 @@ setInterval(() => {
       verificationTokens.delete(token);
     }
   }
-}, 60000);
+  const retryCutoff = now - 10000;
+  for (const [key, ts] of recentClicksCache.entries()) {
+    if (ts < retryCutoff) {
+      recentClicksCache.delete(key);
+    }
+  }
+}, 30000);
 
 export class UrlService {
   constructor(urlRepo = urlRepository, clickRepo = clickRepository) {
     this.urlRepo = urlRepo;
     this.clickRepo = clickRepo;
+  }
+
+  /**
+   * Helper to verify user ownership of a short link
+   */
+  _verifyOwnership(url, userId = null) {
+    if (!url) return;
+    const linkOwner = url.ownerId || url.userId;
+    if (linkOwner) {
+      if (!userId) {
+        const error = new Error('Authentication required to modify this link.');
+        error.statusCode = 401;
+        throw error;
+      }
+      if (String(linkOwner) !== String(userId)) {
+        const error = new Error('You do not have permission to modify this link.');
+        error.statusCode = 403;
+        throw error;
+      }
+    }
   }
 
   /**
@@ -48,7 +77,9 @@ export class UrlService {
     clickLimit,
     password,
     isOneTimeUse = false,
-    title = ''
+    title = '',
+    ownerId = null,
+    userId = null
   }) {
     // 1. Validate long URL
     const urlValidation = validateUrl(longUrl);
@@ -143,6 +174,7 @@ export class UrlService {
 
     // 6. Create record
     const id = crypto.randomUUID();
+    const effectiveOwner = ownerId || userId || null;
     const newRecord = await this.urlRepo.create({
       id,
       code,
@@ -154,6 +186,8 @@ export class UrlService {
       expiresAt: validExpiresAt,
       clickLimit: validClickLimit,
       isOneTimeUse: Boolean(isOneTimeUse),
+      ownerId: effectiveOwner,
+      userId: effectiveOwner,
       isActive: true
     });
 
@@ -220,7 +254,8 @@ export class UrlService {
   }
 
   /**
-   * Process a link redirect request.
+   * Process a link redirect request reliably with atomic concurrency control,
+   * limit enforcement, privacy-preserving tracking, and retry deduplication.
    */
   async resolveRedirect(code, req) {
     const record = await this.urlRepo.findByCode(code);
@@ -233,8 +268,13 @@ export class UrlService {
       return { status: 'expired', reason: 'time_expired', record: this.sanitizeUrl(record) };
     }
 
-    // Check click limit
+    // Check click limit in memory
     if (record.clickLimit && record.clicks >= record.clickLimit) {
+      return { status: 'expired', reason: 'limit_reached', record: this.sanitizeUrl(record) };
+    }
+
+    // Check one-time use in memory
+    if (record.isOneTimeUse && record.clicks >= 1) {
       return { status: 'expired', reason: 'limit_reached', record: this.sanitizeUrl(record) };
     }
 
@@ -255,25 +295,57 @@ export class UrlService {
       }
     }
 
-    // Fast asynchronous tracking: update click count & log event without blocking redirect response
+    // Privacy-preserving client metadata extraction
     const clientMeta = parseClientMetadata(
-      req.headers['user-agent'] || '',
+      req.headers?.['user-agent'] || '',
       req.ip || req.connection?.remoteAddress || '',
-      req.headers['referer'] || req.headers['referrer'] || ''
+      req.headers?.['referer'] || req.headers?.['referrer'] || '',
+      req.headers || {}
     );
 
-    // Increment click and persist event
-    this.urlRepo.incrementClicks(record.id).catch((err) => {
-      console.error('[UrlService] Error incrementing clicks:', err);
+    // Request retry deduplication check (2.5s window per link + visitor)
+    const requestId = req.headers?.['x-request-id'] || req.headers?.['x-idempotency-key'];
+    const dedupeKey = requestId ? `req:${requestId}` : `${record.id}:${clientMeta.visitorId}`;
+    const now = Date.now();
+    const lastSeen = recentClicksCache.get(dedupeKey);
+    const isRetry = Boolean(lastSeen && now - lastSeen < 2500);
+
+    if (isRetry) {
+      // Return destination directly without double-counting clicks or inserting duplicate events
+      return {
+        status: 'redirect',
+        destinationUrl: record.longUrl,
+        isRetry: true
+      };
+    }
+
+    // Update deduplication timestamp
+    recentClicksCache.set(dedupeKey, now);
+
+    // Concurrency-safe atomic increment and limit enforcement
+    const incrementRes = await this.urlRepo.atomicIncrementClicks(record.id, {
+      isOneTimeUse: Boolean(record.isOneTimeUse)
     });
 
-    this.clickRepo.recordClick({
-      urlId: record.id,
-      code: record.code,
-      ...clientMeta
-    }).catch((err) => {
-      console.error('[UrlService] Error recording click event:', err);
-    });
+    if (!incrementRes.allowed) {
+      return {
+        status: 'expired',
+        reason: incrementRes.reason || 'limit_reached',
+        record: this.sanitizeUrl(incrementRes.record || record)
+      };
+    }
+
+    // Reliable persistence of click event (tracked in ClickRepository in-flight queue)
+    try {
+      await this.clickRepo.recordClick({
+        urlId: record.id,
+        code: record.code,
+        ...clientMeta
+      });
+    } catch (persistErr) {
+      console.error('[UrlService] Failed to record click event in MongoDB:', persistErr.message);
+      // Even if logging the event hits an unexpected storage issue, the redirect was authorized
+    }
 
     return {
       status: 'redirect',
@@ -299,13 +371,15 @@ export class UrlService {
     return this.sanitizeUrl(record);
   }
 
-  async updateUrl(id, updates) {
+  async updateUrl(id, updates, currentUser = null) {
     const existing = await this.urlRepo.findById(id);
     if (!existing) {
       const error = new Error('URL record not found');
       error.statusCode = 404;
       throw error;
     }
+
+    this._verifyOwnership(existing, currentUser?.id);
 
     const safeUpdates = {};
 
@@ -376,13 +450,15 @@ export class UrlService {
     return this.sanitizeUrl(updated);
   }
 
-  async deleteUrl(id) {
+  async deleteUrl(id, currentUser = null) {
     const record = await this.urlRepo.findById(id);
     if (!record) {
       const error = new Error('URL record not found');
       error.statusCode = 404;
       throw error;
     }
+
+    this._verifyOwnership(record, currentUser?.id);
 
     await this.urlRepo.delete(id);
     // Delete associated clicks

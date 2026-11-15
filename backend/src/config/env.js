@@ -75,6 +75,50 @@ const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',').map((o) => o.trim().replace(/\/+$/, '')).filter(Boolean)
   : [];
 
+/**
+ * Normalizes MongoDB URI: appends '/shortly' database name if omitted before query parameters.
+ */
+export function normalizeMongoUri(rawUri) {
+  if (!rawUri || rawUri === 'PASTE_YOUR_MONGODB_CONNECTION_STRING_HERE') return rawUri || '';
+  const trimmed = rawUri.trim();
+  if (trimmed.startsWith('mongodb://') || trimmed.startsWith('mongodb+srv://')) {
+    try {
+      const qIdx = trimmed.indexOf('?');
+      const base = qIdx !== -1 ? trimmed.slice(0, qIdx) : trimmed;
+      const query = qIdx !== -1 ? trimmed.slice(qIdx) : '';
+      const slashAfterProtocol = base.indexOf('://') + 3;
+      const slashIndex = base.indexOf('/', slashAfterProtocol);
+      if (slashIndex === -1 || slashIndex === base.length - 1) {
+        const cleanBase = base.replace(/\/+$/, '');
+        return `${cleanBase}/shortly${query}`;
+      }
+    } catch {}
+  }
+  return trimmed;
+}
+
+/**
+ * Mask sensitive credentials in MongoDB URI for safe logging and diagnostics.
+ */
+export function maskMongoUri(uri) {
+  if (!uri || uri === 'PASTE_YOUR_MONGODB_CONNECTION_STRING_HERE') return 'NOT_CONFIGURED';
+  try {
+    const atIndex = uri.lastIndexOf('@');
+    if (atIndex === -1) return 'mongodb://******';
+    const protoEnd = uri.indexOf('://') + 3;
+    const creds = uri.slice(protoEnd, atIndex);
+    const colonIdx = creds.indexOf(':');
+    if (colonIdx === -1) return `${uri.slice(0, protoEnd)}******${uri.slice(atIndex)}`;
+    const username = creds.slice(0, colonIdx);
+    return `${uri.slice(0, protoEnd)}${username}:******${uri.slice(atIndex)}`;
+  } catch {
+    return 'mongodb+srv://******';
+  }
+}
+
+const rawMongoUri = process.env.MONGODB_URI || '';
+const mongodbUri = normalizeMongoUri(rawMongoUri);
+
 export const config = {
   env,
   isProd,
@@ -85,6 +129,7 @@ export const config = {
   publicUrl,
   frontendUrl,
   allowedOrigins,
+  mongodbUri,
   dataDir: process.env.DATA_DIR || defaultDataDir,
 
   // Rate limiting
@@ -96,7 +141,18 @@ export const config = {
   allowLocalhostDestinations: process.env.ALLOW_LOCAL_URLS === 'true' || isDev,
 
   // Short code length
-  shortCodeLength: parseInt(process.env.SHORT_CODE_LENGTH || '7', 10)
+  shortCodeLength: parseInt(process.env.SHORT_CODE_LENGTH || '7', 10),
+
+  // Authentication & Security
+  jwtSecret: process.env.JWT_SECRET || 'shortly-access-secret-default-change-in-production-2026',
+  jwtExpiresIn: process.env.JWT_EXPIRES_IN || '15m',
+  jwtRefreshSecret: process.env.JWT_REFRESH_SECRET || 'shortly-refresh-secret-default-change-in-production-2026',
+  jwtRefreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+  cookieSecret: process.env.COOKIE_SECRET || 'shortly-cookie-signing-secret-default-2026',
+  cookieSecure: process.env.COOKIE_SECURE === 'true' || (isProd && process.env.COOKIE_SECURE !== 'false'),
+  cookieSameSite: process.env.COOKIE_SAMESITE || 'lax',
+  authRateLimitMax: parseInt(process.env.AUTH_RATE_LIMIT_MAX || '10', 10),
+  authRateLimitWindowMs: parseInt(process.env.AUTH_RATE_LIMIT_WINDOW_MS || String(15 * 60 * 1000), 10)
 };
 
 // Private / loopback IPv4 patterns

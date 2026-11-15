@@ -1,226 +1,319 @@
-import path from 'path';
-import { AtomicStorage } from '../utils/atomicStorage.js';
-import { config } from '../config/env.js';
+import mongoose from 'mongoose';
+import { Url } from '../models/Url.js';
+import { isDatabaseConnected } from '../config/database.js';
 
 export class UrlRepository {
-  constructor(storageDir = config.dataDir) {
-    this.storage = new AtomicStorage(path.join(storageDir, 'urls.json'));
-    // In-memory indexes for O(1) lookups
-    this.urlsById = new Map();
-    this.urlsByCode = new Map();
-    this.isInitialized = false;
+  /**
+   * Asserts that MongoDB Atlas is connected before executing any database operation.
+   * Prevents silently starting or accepting requests when the database is unavailable.
+   */
+  assertConnected() {
+    if (!isDatabaseConnected()) {
+      const error = new Error('Database service unavailable. MongoDB Atlas is not connected.');
+      error.statusCode = 503;
+      throw error;
+    }
   }
 
   async init() {
-    if (this.isInitialized) return;
-    const records = await this.storage.read([]);
-    this.urlsById.clear();
-    this.urlsByCode.clear();
-
-    for (const record of records) {
-      this.urlsById.set(record.id, record);
-      this.urlsByCode.set(record.code.toLowerCase(), record);
+    this.assertConnected();
+    try {
+      await Url.init();
+    } catch (err) {
+      console.warn('⚠️ [UrlRepository] Model index initialization warning:', err.message);
     }
-    this.isInitialized = true;
   }
 
-  async _persist() {
-    const records = Array.from(this.urlsById.values());
-    await this.storage.write(records);
+  /**
+   * Formats a Mongoose document or plain object into a clean serializable record
+   */
+  _formatDoc(doc) {
+    if (!doc) return null;
+    const obj = typeof doc.toObject === 'function' ? doc.toObject() : { ...doc };
+    delete obj._id;
+    delete obj.__v;
+    if (obj.createdAt instanceof Date) obj.createdAt = obj.createdAt.toISOString();
+    if (obj.updatedAt instanceof Date) obj.updatedAt = obj.updatedAt.toISOString();
+    if (obj.expiresAt instanceof Date) obj.expiresAt = obj.expiresAt.toISOString();
+    return obj;
   }
 
-  async findAll({ search = '', status = 'all', sortBy = 'createdAt', sortOrder = 'desc', page = 1, limit = 20 } = {}) {
-    await this.init();
-    let records = Array.from(this.urlsById.values());
+  /**
+   * Build MongoDB ID filter matching either string UUID id or ObjectId _id
+   */
+  _buildIdFilter(id) {
+    if (!id) return { id: null };
+    if (mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === String(id)) {
+      return { $or: [{ id }, { _id: id }] };
+    }
+    return { id };
+  }
+
+  async findAll({
+    search = '',
+    status = 'all',
+    sortBy = 'createdAt',
+    sortOrder = 'desc',
+    page = 1,
+    limit = 20,
+    ownerId = null
+  } = {}) {
+    this.assertConnected();
     const now = new Date();
+    const conditions = [];
 
-    // Filter by search query
-    if (search) {
-      const q = search.toLowerCase();
-      records = records.filter(
-        (u) =>
-          u.code.toLowerCase().includes(q) ||
-          u.longUrl.toLowerCase().includes(q) ||
-          (u.title && u.title.toLowerCase().includes(q))
-      );
+    // Search query across code, longUrl, or title
+    if (search && search.trim()) {
+      const escaped = search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      conditions.push({
+        $or: [
+          { code: new RegExp(escaped, 'i') },
+          { longUrl: new RegExp(escaped, 'i') },
+          { title: new RegExp(escaped, 'i') }
+        ]
+      });
     }
 
-    // Filter by status
+    // Status filter
     if (status === 'active') {
-      records = records.filter((u) => {
-        if (!u.isActive) return false;
-        if (u.expiresAt && new Date(u.expiresAt) < now) return false;
-        if (u.clickLimit && u.clicks >= u.clickLimit) return false;
-        return true;
-      });
+      conditions.push({ isActive: true });
+      conditions.push({ $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }] });
+      conditions.push({ $or: [{ clickLimit: null }, { $expr: { $lt: ['$clicks', '$clickLimit'] } }] });
     } else if (status === 'disabled') {
-      records = records.filter((u) => !u.isActive);
+      conditions.push({ isActive: false });
     } else if (status === 'expired') {
-      records = records.filter((u) => {
-        const isTimeExpired = u.expiresAt && new Date(u.expiresAt) < now;
-        const isLimitReached = u.clickLimit && u.clicks >= u.clickLimit;
-        return isTimeExpired || isLimitReached;
+      conditions.push({
+        $or: [
+          { expiresAt: { $lte: now } },
+          { $and: [{ clickLimit: { $ne: null } }, { $expr: { $gte: ['$clicks', '$clickLimit'] } }] }
+        ]
       });
     }
 
-    // Sorting
-    records.sort((a, b) => {
-      let valA = a[sortBy];
-      let valB = b[sortBy];
+    // Owner filter if specified
+    if (ownerId) {
+      conditions.push({
+        $or: [{ ownerId }, { userId: ownerId }]
+      });
+    }
 
-      if (sortBy === 'createdAt' || sortBy === 'updatedAt' || sortBy === 'expiresAt') {
-        valA = valA ? new Date(valA).getTime() : 0;
-        valB = valB ? new Date(valB).getTime() : 0;
-      }
+    const query = conditions.length > 0 ? { $and: conditions } : {};
 
-      if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
-      if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
-      return 0;
-    });
+    const sortDir = sortOrder === 'asc' ? 1 : -1;
+    const sort = { [sortBy]: sortDir };
 
-    const total = records.length;
-    const startIndex = (page - 1) * limit;
-    const items = records.slice(startIndex, startIndex + limit);
+    const parsedPage = Math.max(1, parseInt(page, 10) || 1);
+    const parsedLimit = Math.max(1, Math.min(100, parseInt(limit, 10) || 20));
+
+    const total = await Url.countDocuments(query);
+    const docs = await Url.find(query)
+      .sort(sort)
+      .skip((parsedPage - 1) * parsedLimit)
+      .limit(parsedLimit)
+      .lean();
 
     return {
-      items,
+      items: docs.map((d) => this._formatDoc(d)),
       pagination: {
         total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit) || 1
+        page: parsedPage,
+        limit: parsedLimit,
+        totalPages: Math.ceil(total / parsedLimit) || 1
       }
     };
   }
 
   async findById(id) {
-    await this.init();
-    return this.urlsById.get(id) || null;
+    this.assertConnected();
+    const filter = this._buildIdFilter(id);
+    const doc = await Url.findOne(filter).lean();
+    return this._formatDoc(doc);
   }
 
   async findByCode(code) {
-    await this.init();
+    this.assertConnected();
     if (!code) return null;
-    return this.urlsByCode.get(code.toLowerCase()) || null;
+    const escaped = code.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const doc = await Url.findOne({ code: new RegExp(`^${escaped}$`, 'i') }).lean();
+    return this._formatDoc(doc);
+  }
+
+  async findByOwner(ownerId, { page = 1, limit = 20 } = {}) {
+    return this.findAll({ ownerId, page, limit });
   }
 
   async create(urlData) {
-    await this.init();
-    const record = {
-      ...urlData,
-      clicks: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-
-    this.urlsById.set(record.id, record);
-    this.urlsByCode.set(record.code.toLowerCase(), record);
-
-    // Queue asynchronous persistent write
-    this._persist().catch((err) => {
-      console.error('[UrlRepository] Error persisting new URL:', err);
-    });
-
-    return record;
+    this.assertConnected();
+    try {
+      const record = {
+        ...urlData,
+        clicks: 0
+      };
+      const doc = await Url.create(record);
+      return this._formatDoc(doc.toJSON());
+    } catch (err) {
+      if (err.code === 11000) {
+        const error = new Error('A link with this short code or custom alias already exists.');
+        error.statusCode = 409;
+        throw error;
+      }
+      throw err;
+    }
   }
 
   async update(id, updates) {
-    await this.init();
-    const existing = this.urlsById.get(id);
-    if (!existing) return null;
+    this.assertConnected();
+    const filter = this._buildIdFilter(id);
+    try {
+      const doc = await Url.findOneAndUpdate(
+        filter,
+        { $set: updates },
+        { returnDocument: 'after', runValidators: true }
+      ).lean();
 
-    const oldCode = existing.code.toLowerCase();
-    const updated = {
-      ...existing,
-      ...updates,
-      id: existing.id, // Immutable ID
-      updatedAt: new Date().toISOString()
+      return this._formatDoc(doc);
+    } catch (err) {
+      if (err.code === 11000) {
+        const error = new Error('The specified custom alias or short code is already in use.');
+        error.statusCode = 409;
+        throw error;
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Concurrency-safe atomic click increment:
+   * Enforces click limits and deactivates one-time use links atomically
+   * so simultaneous requests cannot exceed limits or double-redirect.
+   */
+  async atomicIncrementClicks(id, { isOneTimeUse = false } = {}) {
+    this.assertConnected();
+    const filter = this._buildIdFilter(id);
+    const now = new Date();
+
+    const query = {
+      ...filter,
+      isActive: true,
+      $and: [
+        { $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }] },
+        { $or: [{ clickLimit: null }, { $expr: { $lt: ['$clicks', '$clickLimit'] } }] },
+        // For one-time links, only allow if clicks is currently 0
+        { $or: [{ isOneTimeUse: false }, { isOneTimeUse: true, clicks: 0 }] }
+      ]
     };
 
-    if (updates.code && updates.code.toLowerCase() !== oldCode) {
-      this.urlsByCode.delete(oldCode);
-      this.urlsByCode.set(updated.code.toLowerCase(), updated);
-    } else {
-      this.urlsByCode.set(updated.code.toLowerCase(), updated);
+    const update = {
+      $inc: { clicks: 1 },
+      $set: { updatedAt: now }
+    };
+
+    // If one-time use is requested, atomically deactivate in the very same update
+    if (isOneTimeUse) {
+      update.$set.isActive = false;
     }
 
-    this.urlsById.set(id, updated);
-    this._persist().catch((err) => {
-      console.error('[UrlRepository] Error persisting URL update:', err);
-    });
+    const doc = await Url.findOneAndUpdate(query, update, { returnDocument: 'after' }).lean();
 
-    return updated;
+    if (!doc) {
+      const existing = await Url.findOne(filter).lean();
+      if (!existing) return { allowed: false, reason: 'not_found' };
+      if (!existing.isActive) return { allowed: false, reason: 'disabled', record: this._formatDoc(existing) };
+      if (existing.expiresAt && new Date(existing.expiresAt) <= now) {
+        return { allowed: false, reason: 'time_expired', record: this._formatDoc(existing) };
+      }
+      if (existing.clickLimit && existing.clicks >= existing.clickLimit) {
+        return { allowed: false, reason: 'limit_reached', record: this._formatDoc(existing) };
+      }
+      if (existing.isOneTimeUse && existing.clicks >= 1) {
+        return { allowed: false, reason: 'one_time_consumed', record: this._formatDoc(existing) };
+      }
+      return { allowed: false, reason: 'limit_reached', record: this._formatDoc(existing) };
+    }
+
+    // Safety fallback: if document is marked isOneTimeUse in DB but caller didn't pass isOneTimeUse option
+    if (doc.isOneTimeUse && doc.isActive) {
+      await Url.updateOne({ _id: doc._id }, { $set: { isActive: false } });
+      doc.isActive = false;
+    }
+
+    return { allowed: true, record: this._formatDoc(doc) };
   }
 
   async incrementClicks(id) {
-    await this.init();
-    const record = this.urlsById.get(id);
-    if (!record) return null;
-
-    record.clicks = (record.clicks || 0) + 1;
-    record.updatedAt = new Date().toISOString();
-
-    // Check if one-time use was consumed
-    if (record.isOneTimeUse) {
-      record.isActive = false;
-    }
-
-    this._persist().catch((err) => {
-      console.error('[UrlRepository] Error persisting click increment:', err);
-    });
-
-    return record;
+    const res = await this.atomicIncrementClicks(id);
+    return res.allowed ? res.record : null;
   }
 
   async delete(id) {
-    await this.init();
-    const record = this.urlsById.get(id);
-    if (!record) return false;
-
-    this.urlsById.delete(id);
-    this.urlsByCode.delete(record.code.toLowerCase());
-
-    await this._persist();
-    return true;
+    this.assertConnected();
+    const filter = this._buildIdFilter(id);
+    const res = await Url.deleteOne(filter);
+    return res.deletedCount > 0;
   }
 
   async bulkDelete(ids) {
-    await this.init();
-    let deletedCount = 0;
-    for (const id of ids) {
-      const record = this.urlsById.get(id);
-      if (record) {
-        this.urlsById.delete(id);
-        this.urlsByCode.delete(record.code.toLowerCase());
-        deletedCount++;
-      }
-    }
-    if (deletedCount > 0) {
-      await this._persist();
-    }
-    return deletedCount;
+    this.assertConnected();
+    if (!Array.isArray(ids) || ids.length === 0) return 0;
+    const objectIds = ids.filter((id) => mongoose.Types.ObjectId.isValid(id));
+    const res = await Url.deleteMany({
+      $or: [{ id: { $in: ids } }, ...(objectIds.length > 0 ? [{ _id: { $in: objectIds } }] : [])]
+    });
+    return res.deletedCount || 0;
   }
 
   async bulkUpdateStatus(ids, isActive) {
-    await this.init();
-    let updatedCount = 0;
-    const now = new Date().toISOString();
-    for (const id of ids) {
-      const record = this.urlsById.get(id);
-      if (record) {
-        record.isActive = Boolean(isActive);
-        record.updatedAt = now;
-        updatedCount++;
+    this.assertConnected();
+    if (!Array.isArray(ids) || ids.length === 0) return 0;
+    const objectIds = ids.filter((id) => mongoose.Types.ObjectId.isValid(id));
+    const res = await Url.updateMany(
+      {
+        $or: [{ id: { $in: ids } }, ...(objectIds.length > 0 ? [{ _id: { $in: objectIds } }] : [])]
+      },
+      {
+        $set: { isActive: Boolean(isActive), updatedAt: new Date() }
       }
+    );
+    return res.modifiedCount || 0;
+  }
+
+  async countAll(filter = {}) {
+    this.assertConnected();
+    const query = {};
+    if (filter.ownerId) {
+      query.$or = [{ ownerId: filter.ownerId }, { userId: filter.ownerId }];
     }
-    if (updatedCount > 0) {
-      await this._persist();
+    return Url.countDocuments(query);
+  }
+
+  async countActive(filter = {}) {
+    this.assertConnected();
+    const now = new Date();
+    const query = {
+      isActive: true,
+      $and: [
+        { $or: [{ expiresAt: null }, { expiresAt: { $gt: now } }] },
+        { $or: [{ clickLimit: null }, { $expr: { $lt: ['$clicks', '$clickLimit'] } }] }
+      ]
+    };
+    if (filter.ownerId) {
+      query.$or = [{ ownerId: filter.ownerId }, { userId: filter.ownerId }];
     }
-    return updatedCount;
+    return Url.countDocuments(query);
+  }
+
+  async findTopPerforming(limit = 5, filter = {}) {
+    this.assertConnected();
+    const query = {};
+    if (filter.ownerId) {
+      query.$or = [{ ownerId: filter.ownerId }, { userId: filter.ownerId }];
+    }
+    const docs = await Url.find(query).sort({ clicks: -1 }).limit(limit).lean();
+    return docs.map((d) => this._formatDoc(d));
   }
 
   async flush() {
-    await this.storage.flush();
+    // No-op for MongoDB (Mongoose writes are immediately committed to Atlas)
   }
 }
 

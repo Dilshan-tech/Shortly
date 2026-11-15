@@ -20,21 +20,24 @@ export const Input = forwardRef(function Input(
   return (
     <div className="w-full space-y-1.5">
       {label && (
-        <label htmlFor={inputId} className="block text-xs font-semibold text-slate-300 tracking-wide uppercase">
+        <label
+          htmlFor={inputId}
+          className="block text-xs font-semibold text-slate-700 dark:text-slate-300 tracking-wide uppercase"
+        >
           {label}
-          {required && <span className="text-rose-400 ml-1">*</span>}
+          {required && <span className="text-rose-500 ml-1">*</span>}
         </label>
       )}
 
-      <div className="relative rounded-lg shadow-sm">
+      <div className="relative rounded-xl shadow-sm">
         {Icon && (
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500">
             <Icon className="w-4 h-4" />
           </div>
         )}
 
         {prefix && (
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500 text-sm font-medium">
+          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 dark:text-slate-500 text-sm font-medium">
             {prefix}
           </div>
         )}
@@ -44,21 +47,23 @@ export const Input = forwardRef(function Input(
           id={inputId}
           type={type}
           required={required}
-          className={`w-full rounded-lg bg-slate-900 border text-slate-100 placeholder-slate-500 text-sm py-2 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/50 ${
-            Icon ? 'pl-9 pr-3' : prefix ? 'pl-16 pr-3' : 'px-3'
+          className={`w-full rounded-xl bg-white dark:bg-slate-950/80 border text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 text-sm py-2.5 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/20 ${
+            Icon ? 'pl-10 pr-3.5' : prefix ? 'pl-16 pr-3.5' : 'px-3.5'
           } ${
             error
-              ? 'border-rose-500 focus:border-rose-500'
-              : 'border-slate-700/80 hover:border-slate-600 focus:border-brand-500'
+              ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500/20'
+              : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 focus:border-brand-500'
           } ${className}`}
           {...props}
         />
       </div>
 
       {error ? (
-        <p className="text-xs text-rose-400 font-medium animate-in fade-in">{error}</p>
+        <p className="text-xs text-rose-500 dark:text-rose-400 font-medium animate-in fade-in">
+          {error}
+        </p>
       ) : helperText ? (
-        <p className="text-xs text-slate-400">{helperText}</p>
+        <p className="text-xs text-slate-500 dark:text-slate-400">{helperText}</p>
       ) : null}
     </div>
   );

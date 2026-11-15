@@ -9,8 +9,8 @@ export function LoadingSpinner({ size = 'md', text = 'Loading...' }) {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center p-8 gap-3 text-slate-400">
-      <Loader2 className={`${sizes[size] || sizes.md} animate-spin text-brand-500`} />
+    <div className="flex flex-col items-center justify-center p-8 gap-3 text-slate-500 dark:text-slate-400">
+      <Loader2 className={`${sizes[size] || sizes.md} animate-spin text-brand-600 dark:text-brand-500`} />
       {text && <p className="text-xs font-medium tracking-wide">{text}</p>}
     </div>
   );

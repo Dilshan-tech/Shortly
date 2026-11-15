@@ -1,10 +1,13 @@
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { config, getConfigWarnings } from './config/env.js';
+import { getDatabaseStatus } from './config/database.js';
+import authRoutes from './routes/authRoutes.js';
 import urlRoutes from './routes/urlRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
 import redirectRoutes from './routes/redirectRoutes.js';
@@ -99,6 +102,9 @@ export function createApp() {
   // Body parser with size limits
   app.use(express.json({ limit: '100kb' }));
 
+  // Cookie parser for secure HttpOnly session tokens
+  app.use(cookieParser(config.cookieSecret));
+
   // Health endpoint
   app.get('/api/health', (req, res) => {
     const isLocalhost = config.publicUrl.includes('localhost') || config.publicUrl.includes('127.0.0.1');
@@ -121,6 +127,7 @@ export function createApp() {
       publicUrl: config.publicUrl,
       frontendUrl: config.frontendUrl,
       environment: config.env,
+      database: getDatabaseStatus(),
       isConfiguredForExternal: !isLocalhost && !isFrontendPort,
       configWarnings: warnings
     });
@@ -130,6 +137,8 @@ export function createApp() {
   app.use('/api/', apiLimiter);
 
   // API Routes
+  app.use('/api/auth', authRoutes);
+  app.use('/api/account', authRoutes);
   app.use('/api/urls', urlRoutes);
   app.use('/api/analytics', analyticsRoutes);
 
@@ -138,7 +147,7 @@ export function createApp() {
     app.use(express.static(frontendDist));
 
     // Client-side routes for SPA
-    app.get(['/', '/create', '/links', '/settings', '/analytics/:id'], (req, res) => {
+    app.get(['/', '/create', '/links', '/settings', '/account', '/login', '/register', '/analytics/:id'], (req, res) => {
       res.sendFile(path.join(frontendDist, 'index.html'));
     });
   } else {

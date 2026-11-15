@@ -13,9 +13,9 @@ export function BrowserChart({ browsers = [] }) {
       />
 
       {total === 0 ? (
-        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-slate-400">
-          <Compass className="w-8 h-8 text-slate-600 mb-2" />
-          <p className="text-xs">No browser data available</p>
+        <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-zinc-400 dark:text-zinc-500">
+          <Compass className="w-8 h-8 text-zinc-300 dark:text-zinc-700 mb-2" />
+          <p className="text-xs font-semibold">No browser data available</p>
         </div>
       ) : (
         <div className="space-y-3.5 my-auto pt-2">
@@ -24,18 +24,18 @@ export function BrowserChart({ browsers = [] }) {
             return (
               <div key={browser.name} className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2 text-slate-300 font-medium">
-                    <Globe className="w-3.5 h-3.5 text-brand-400" />
+                  <div className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300 font-semibold">
+                    <Globe className="w-3.5 h-3.5 text-brand-500 shrink-0" />
                     <span>{browser.name}</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-slate-400">{browser.count}</span>
-                    <span className="font-semibold text-slate-200 w-9 text-right">{pct}%</span>
+                    <span className="text-zinc-400 dark:text-zinc-500 font-medium">{browser.count}</span>
+                    <span className="font-bold text-zinc-900 dark:text-white w-9 text-right">{pct}%</span>
                   </div>
                 </div>
-                <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+                <div className="w-full h-1.5 rounded-full bg-zinc-100 dark:bg-white/[0.06] overflow-hidden">
                   <div
-                    className="h-full rounded-full bg-gradient-to-r from-brand-600 to-violet-500 transition-all duration-500"
+                    className="h-full rounded-full bg-gradient-to-r from-brand-500 to-violet-500 transition-all duration-500"
                     style={{ width: `${pct}%` }}
                   />
                 </div>
