@@ -466,24 +466,24 @@ export class UrlService {
     return true;
   }
 
-  async bulkDelete(ids) {
+  async bulkDelete(ids, currentUser = null) {
     if (!Array.isArray(ids) || ids.length === 0) {
       const error = new Error('An array of URL IDs is required');
       error.statusCode = 400;
       throw error;
     }
-    const count = await this.urlRepo.bulkDelete(ids);
+    const count = await this.urlRepo.bulkDelete(ids, currentUser?.id);
     await this.clickRepo.bulkDeleteByUrlIds(ids);
     return { count };
   }
 
-  async bulkStatus(ids, isActive) {
+  async bulkStatus(ids, isActive, currentUser = null) {
     if (!Array.isArray(ids) || ids.length === 0) {
       const error = new Error('An array of URL IDs is required');
       error.statusCode = 400;
       throw error;
     }
-    const count = await this.urlRepo.bulkUpdateStatus(ids, isActive);
+    const count = await this.urlRepo.bulkUpdateStatus(ids, isActive, currentUser?.id);
     return { count };
   }
 }

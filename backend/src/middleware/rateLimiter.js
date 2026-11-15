@@ -1,12 +1,15 @@
 import rateLimit from 'express-rate-limit';
 import { config } from '../config/env.js';
 
+const isTestEnv = () => process.env.NODE_ENV === 'test';
+
 // General API Rate Limiter
 export const apiLimiter = rateLimit({
   windowMs: config.rateLimitWindowMs,
   max: config.rateLimitMaxRequests,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: isTestEnv,
   message: {
     success: false,
     error: 'Too many requests from this IP. Please try again after 15 minutes.'
@@ -19,6 +22,7 @@ export const createUrlLimiter = rateLimit({
   max: 30, // 30 new links per minute per IP
   standardHeaders: true,
   legacyHeaders: false,
+  skip: isTestEnv,
   message: {
     success: false,
     error: 'Link creation rate limit reached. Please wait a moment.'
@@ -31,6 +35,7 @@ export const passwordLimiter = rateLimit({
   max: 10, // 10 password attempts per minute
   standardHeaders: true,
   legacyHeaders: false,
+  skip: isTestEnv,
   message: {
     success: false,
     error: 'Too many password attempts. Please wait a minute before trying again.'
@@ -43,6 +48,7 @@ export const redirectLimiter = rateLimit({
   max: config.redirectRateLimitMax,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: isTestEnv,
   message: {
     success: false,
     error: 'Redirect rate limit exceeded. Please wait a few seconds.'
@@ -56,7 +62,7 @@ export const authLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skipSuccessfulRequests: false,
-  skip: () => process.env.NODE_ENV === 'test',
+  skip: isTestEnv,
   message: {
     success: false,
     error: 'Too many authentication attempts from this IP. Please try again after 15 minutes.'

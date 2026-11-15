@@ -63,7 +63,7 @@ export class UrlRepository {
     const conditions = [];
 
     // Search query across code, longUrl, or title
-    if (search && search.trim()) {
+    if (search && typeof search === 'string' && search.trim()) {
       const escaped = search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       conditions.push({
         $or: [
@@ -252,28 +252,35 @@ export class UrlRepository {
     return res.deletedCount > 0;
   }
 
-  async bulkDelete(ids) {
+  async bulkDelete(ids, ownerId = null) {
     this.assertConnected();
     if (!Array.isArray(ids) || ids.length === 0) return 0;
     const objectIds = ids.filter((id) => mongoose.Types.ObjectId.isValid(id));
-    const res = await Url.deleteMany({
+    const idCondition = {
       $or: [{ id: { $in: ids } }, ...(objectIds.length > 0 ? [{ _id: { $in: objectIds } }] : [])]
-    });
+    };
+    const query = ownerId
+      ? { $and: [idCondition, { $or: [{ ownerId }, { userId: ownerId }] }] }
+      : idCondition;
+
+    const res = await Url.deleteMany(query);
     return res.deletedCount || 0;
   }
 
-  async bulkUpdateStatus(ids, isActive) {
+  async bulkUpdateStatus(ids, isActive, ownerId = null) {
     this.assertConnected();
     if (!Array.isArray(ids) || ids.length === 0) return 0;
     const objectIds = ids.filter((id) => mongoose.Types.ObjectId.isValid(id));
-    const res = await Url.updateMany(
-      {
-        $or: [{ id: { $in: ids } }, ...(objectIds.length > 0 ? [{ _id: { $in: objectIds } }] : [])]
-      },
-      {
-        $set: { isActive: Boolean(isActive), updatedAt: new Date() }
-      }
-    );
+    const idCondition = {
+      $or: [{ id: { $in: ids } }, ...(objectIds.length > 0 ? [{ _id: { $in: objectIds } }] : [])]
+    };
+    const query = ownerId
+      ? { $and: [idCondition, { $or: [{ ownerId }, { userId: ownerId }] }] }
+      : idCondition;
+
+    const res = await Url.updateMany(query, {
+      $set: { isActive: Boolean(isActive), updatedAt: new Date() }
+    });
     return res.modifiedCount || 0;
   }
 

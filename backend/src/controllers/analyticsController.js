@@ -1,7 +1,8 @@
 import { analyticsService } from '../services/analyticsService.js';
 
 function extractAuthOwner(req) {
-  return req.user?.id || req.headers?.['x-user-id'] || req.query?.ownerId || null;
+  // Security: strictly enforce authenticated session identity; never trust unauthenticated query or headers
+  return req.user?.id || null;
 }
 
 export const analyticsController = {
@@ -29,13 +30,15 @@ export const analyticsController = {
   async timeseries(req, res, next) {
     try {
       const { range, days, startDate, endDate, urlId, includeBots } = req.query;
+      const ownerId = extractAuthOwner(req);
       const data = await analyticsService.getTimeseries({
         range,
         days: days ? parseInt(days, 10) : null,
         startDate,
         endDate,
         urlId,
-        includeBots: includeBots === 'true'
+        includeBots: includeBots === 'true',
+        ownerId
       });
       res.json({
         success: true,
@@ -49,13 +52,15 @@ export const analyticsController = {
   async devices(req, res, next) {
     try {
       const { range, days, startDate, endDate, urlId, includeBots } = req.query;
+      const ownerId = extractAuthOwner(req);
       const data = await analyticsService.getDevices({
         range,
         days: days ? parseInt(days, 10) : null,
         startDate,
         endDate,
         urlId,
-        includeBots: includeBots === 'true'
+        includeBots: includeBots === 'true',
+        ownerId
       });
       res.json({
         success: true,
@@ -69,13 +74,15 @@ export const analyticsController = {
   async browsers(req, res, next) {
     try {
       const { range, days, startDate, endDate, urlId, includeBots } = req.query;
+      const ownerId = extractAuthOwner(req);
       const data = await analyticsService.getBrowsers({
         range,
         days: days ? parseInt(days, 10) : null,
         startDate,
         endDate,
         urlId,
-        includeBots: includeBots === 'true'
+        includeBots: includeBots === 'true',
+        ownerId
       });
       res.json({
         success: true,
@@ -89,13 +96,15 @@ export const analyticsController = {
   async os(req, res, next) {
     try {
       const { range, days, startDate, endDate, urlId, includeBots } = req.query;
+      const ownerId = extractAuthOwner(req);
       const data = await analyticsService.getOs({
         range,
         days: days ? parseInt(days, 10) : null,
         startDate,
         endDate,
         urlId,
-        includeBots: includeBots === 'true'
+        includeBots: includeBots === 'true',
+        ownerId
       });
       res.json({
         success: true,
@@ -109,13 +118,15 @@ export const analyticsController = {
   async referrers(req, res, next) {
     try {
       const { range, days, startDate, endDate, urlId, includeBots } = req.query;
+      const ownerId = extractAuthOwner(req);
       const data = await analyticsService.getReferrers({
         range,
         days: days ? parseInt(days, 10) : null,
         startDate,
         endDate,
         urlId,
-        includeBots: includeBots === 'true'
+        includeBots: includeBots === 'true',
+        ownerId
       });
       res.json({
         success: true,
@@ -129,13 +140,15 @@ export const analyticsController = {
   async countries(req, res, next) {
     try {
       const { range, days, startDate, endDate, urlId, includeBots } = req.query;
+      const ownerId = extractAuthOwner(req);
       const data = await analyticsService.getCountries({
         range,
         days: days ? parseInt(days, 10) : null,
         startDate,
         endDate,
         urlId,
-        includeBots: includeBots === 'true'
+        includeBots: includeBots === 'true',
+        ownerId
       });
       res.json({
         success: true,

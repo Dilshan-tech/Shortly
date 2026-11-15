@@ -36,6 +36,21 @@ export class ClickRepository {
 
   _buildUrlMatch(urlId) {
     if (!urlId) return {};
+    if (Array.isArray(urlId)) {
+      if (urlId.length === 0) {
+        return { urlId: '__NO_MATCH_SCOPE__' };
+      }
+      const stringIds = urlId.map((id) => String(id));
+      const objectIds = urlId
+        .filter((id) => mongoose.Types.ObjectId.isValid(id))
+        .map((id) => new mongoose.Types.ObjectId(id));
+      return {
+        $or: [
+          { urlId: { $in: stringIds } },
+          ...(objectIds.length > 0 ? [{ url: { $in: objectIds } }] : [])
+        ]
+      };
+    }
     if (mongoose.Types.ObjectId.isValid(urlId)) {
       return { $or: [{ urlId }, { url: new mongoose.Types.ObjectId(urlId) }] };
     }
@@ -539,10 +554,13 @@ export class ClickRepository {
     };
   }
 
-  async findRecent(limit = 20, { includeBots = false } = {}) {
+  async findRecent(limit = 20, { urlId = null, includeBots = false } = {}) {
     this.assertConnected();
     const parsedLimit = Math.max(1, Math.min(100, parseInt(limit, 10) || 20));
-    const match = includeBots ? {} : { isBot: { $ne: true } };
+    const match = {
+      ...this._buildUrlMatch(urlId),
+      ...(includeBots ? {} : { isBot: { $ne: true } })
+    };
     const docs = await Click.find(match).sort({ timestamp: -1 }).limit(parsedLimit).lean();
     return docs.map((d) => this._formatClickDoc(d));
   }

@@ -21,6 +21,9 @@ const frontendDist = path.resolve(__dirname, '../../frontend/dist');
 export function createApp() {
   const app = express();
 
+  // Hide Express server footprint
+  app.disable('x-powered-by');
+
   // Trust proxy for reverse proxies / tunneling (e.g. ngrok, Caddy, Cloudflare)
   app.set('trust proxy', 1);
 
@@ -92,7 +95,8 @@ export function createApp() {
           return callback(null, true);
         }
 
-        callback(new Error(`CORS error: Origin "${origin}" is not permitted.`));
+        // In production mode, reject disallowed origins cleanly without 500 error
+        callback(null, false);
       },
       credentials: true,
       methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS']
@@ -101,6 +105,24 @@ export function createApp() {
 
   // Body parser with size limits
   app.use(express.json({ limit: '100kb' }));
+
+  // NoSQL Injection Sanitizer: recursively sanitize keys starting with $ or containing .
+  app.use((req, res, next) => {
+    const sanitize = (obj) => {
+      if (!obj || typeof obj !== 'object') return;
+      for (const key of Object.keys(obj)) {
+        if (key.startsWith('$') || key.includes('.')) {
+          delete obj[key];
+        } else if (typeof obj[key] === 'object') {
+          sanitize(obj[key]);
+        }
+      }
+    };
+    if (req.body) sanitize(req.body);
+    if (req.query) sanitize(req.query);
+    if (req.params) sanitize(req.params);
+    next();
+  });
 
   // Cookie parser for secure HttpOnly session tokens
   app.use(cookieParser(config.cookieSecret));

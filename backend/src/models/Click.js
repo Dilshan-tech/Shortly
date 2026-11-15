@@ -89,6 +89,7 @@ const clickSchema = new mongoose.Schema(
 
 // Compound indexes for high-performance aggregation and date-filtering
 clickSchema.index({ urlId: 1, isBot: 1, timestamp: -1 });
+clickSchema.index({ urlId: 1, isBot: 1, visitorId: 1, timestamp: -1 });
 clickSchema.index({ code: 1, isBot: 1, timestamp: -1 });
 clickSchema.index({ isBot: 1, timestamp: -1 });
 clickSchema.index({ urlId: 1, visitorId: 1 });

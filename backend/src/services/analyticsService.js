@@ -29,6 +29,30 @@ export class AnalyticsService {
   }
 
   /**
+   * Resolves target URL ID(s) scoped by ownership:
+   * - If specific urlId provided: verifies caller owns it
+   * - If ownerId provided: resolves all URL IDs owned by that user
+   * - Otherwise: returns null (global scope for unauthenticated or admin queries)
+   */
+  async _resolveScopedUrlIds(urlId = null, ownerId = null) {
+    if (urlId) {
+      const url = await this.urlRepo.findById(urlId);
+      if (!url) {
+        const error = new Error('URL not found');
+        error.statusCode = 404;
+        throw error;
+      }
+      this._verifyOwnership(url, ownerId);
+      return urlId;
+    }
+    if (ownerId) {
+      const userUrls = await this.urlRepo.findAll({ ownerId, limit: 5000 });
+      return userUrls.items.map((u) => u.id);
+    }
+    return null;
+  }
+
+  /**
    * Parse range parameters consistently: accepts range ('24h', '7d', '30d', '90d', 'custom')
    * or legacy 'days' query (e.g. 7, 30).
    */
@@ -62,14 +86,15 @@ export class AnalyticsService {
     await this.clickRepo.init();
 
     const rangeConfig = this._normalizeRange({ range, days, startDate, endDate });
+    const scopedUrlId = await this._resolveScopedUrlIds(null, ownerId);
 
-    // Link counts (scoped to owner if specified)
+    // Link counts and analytics strictly scoped to owner
     const [totalLinks, activeLinks, clickStats, topPerforming, recentClicks] = await Promise.all([
       this.urlRepo.countAll(ownerId ? { ownerId } : {}),
       this.urlRepo.countActive(ownerId ? { ownerId } : {}),
-      this.clickRepo.getSummary(null, { ...rangeConfig, includeBots }),
+      this.clickRepo.getSummary(scopedUrlId, { ...rangeConfig, includeBots }),
       this.urlRepo.findTopPerforming(6, ownerId ? { ownerId } : {}),
-      this.clickRepo.findRecent(12, { includeBots })
+      this.clickRepo.findRecent(12, { urlId: scopedUrlId, includeBots })
     ]);
 
     const topUrls = topPerforming.map((u) => ({
@@ -172,61 +197,54 @@ export class AnalyticsService {
     };
   }
 
-  async getTimeseries({ range = '7d', days = null, startDate = null, endDate = null, urlId = null, includeBots = false } = {}) {
+  async getTimeseries({ range = '7d', days = null, startDate = null, endDate = null, urlId = null, ownerId = null, includeBots = false } = {}) {
     const rangeConfig = this._normalizeRange({ range, days, startDate, endDate });
-    return this.clickRepo.getTimeseries({ urlId, ...rangeConfig, includeBots });
+    const scopedUrlId = await this._resolveScopedUrlIds(urlId, ownerId);
+    return this.clickRepo.getTimeseries({ urlId: scopedUrlId, ...rangeConfig, includeBots });
   }
 
-  async getDevices({ range = '30d', days = null, startDate = null, endDate = null, urlId = null, includeBots = false } = {}) {
+  async getDevices({ range = '30d', days = null, startDate = null, endDate = null, urlId = null, ownerId = null, includeBots = false } = {}) {
     const rangeConfig = this._normalizeRange({ range, days, startDate, endDate });
-    return this.clickRepo.getDeviceBreakdown({ urlId, ...rangeConfig, includeBots });
+    const scopedUrlId = await this._resolveScopedUrlIds(urlId, ownerId);
+    return this.clickRepo.getDeviceBreakdown({ urlId: scopedUrlId, ...rangeConfig, includeBots });
   }
 
-  async getBrowsers({ range = '30d', days = null, startDate = null, endDate = null, urlId = null, includeBots = false } = {}) {
+  async getBrowsers({ range = '30d', days = null, startDate = null, endDate = null, urlId = null, ownerId = null, includeBots = false } = {}) {
     const rangeConfig = this._normalizeRange({ range, days, startDate, endDate });
-    return this.clickRepo.getBrowserBreakdown({ urlId, ...rangeConfig, includeBots });
+    const scopedUrlId = await this._resolveScopedUrlIds(urlId, ownerId);
+    return this.clickRepo.getBrowserBreakdown({ urlId: scopedUrlId, ...rangeConfig, includeBots });
   }
 
-  async getOs({ range = '30d', days = null, startDate = null, endDate = null, urlId = null, includeBots = false } = {}) {
+  async getOs({ range = '30d', days = null, startDate = null, endDate = null, urlId = null, ownerId = null, includeBots = false } = {}) {
     const rangeConfig = this._normalizeRange({ range, days, startDate, endDate });
-    return this.clickRepo.getOsBreakdown({ urlId, ...rangeConfig, includeBots });
+    const scopedUrlId = await this._resolveScopedUrlIds(urlId, ownerId);
+    return this.clickRepo.getOsBreakdown({ urlId: scopedUrlId, ...rangeConfig, includeBots });
   }
 
-  async getReferrers({ range = '30d', days = null, startDate = null, endDate = null, urlId = null, includeBots = false } = {}) {
+  async getReferrers({ range = '30d', days = null, startDate = null, endDate = null, urlId = null, ownerId = null, includeBots = false } = {}) {
     const rangeConfig = this._normalizeRange({ range, days, startDate, endDate });
-    return this.clickRepo.getReferrerBreakdown({ urlId, ...rangeConfig, includeBots });
+    const scopedUrlId = await this._resolveScopedUrlIds(urlId, ownerId);
+    return this.clickRepo.getReferrerBreakdown({ urlId: scopedUrlId, ...rangeConfig, includeBots });
   }
 
-  async getCountries({ range = '30d', days = null, startDate = null, endDate = null, urlId = null, includeBots = false } = {}) {
+  async getCountries({ range = '30d', days = null, startDate = null, endDate = null, urlId = null, ownerId = null, includeBots = false } = {}) {
     const rangeConfig = this._normalizeRange({ range, days, startDate, endDate });
-    return this.clickRepo.getCountryBreakdown({ urlId, ...rangeConfig, includeBots });
+    const scopedUrlId = await this._resolveScopedUrlIds(urlId, ownerId);
+    return this.clickRepo.getCountryBreakdown({ urlId: scopedUrlId, ...rangeConfig, includeBots });
   }
 
   async getClicks(params = {}) {
     const { urlId, ownerId } = params;
-    if (urlId) {
-      const url = await this.urlRepo.findById(urlId);
-      if (!url) {
-        const error = new Error('URL not found');
-        error.statusCode = 404;
-        throw error;
-      }
-      this._verifyOwnership(url, ownerId);
-    }
-    return this.clickRepo.findClicks(params);
+    const scopedUrlId = await this._resolveScopedUrlIds(urlId, ownerId);
+    return this.clickRepo.findClicks({
+      ...params,
+      urlId: scopedUrlId
+    });
   }
 
   async exportCsv({ urlId = null, range = '30d', startDate = null, endDate = null, includeBots = false, ownerId = null } = {}) {
-    if (urlId) {
-      const url = await this.urlRepo.findById(urlId);
-      if (!url) {
-        const error = new Error('URL not found');
-        error.statusCode = 404;
-        throw error;
-      }
-      this._verifyOwnership(url, ownerId);
-    }
-    return this.clickRepo.exportCsv({ urlId, range, startDate, endDate, includeBots });
+    const scopedUrlId = await this._resolveScopedUrlIds(urlId, ownerId);
+    return this.clickRepo.exportCsv({ urlId: scopedUrlId, range, startDate, endDate, includeBots });
   }
 }
 

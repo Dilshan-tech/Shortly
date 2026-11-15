@@ -3,16 +3,16 @@ import { urlController } from '../controllers/urlController.js';
 import { analyticsController } from '../controllers/analyticsController.js';
 import { validateBody, createUrlSchema, updateUrlSchema } from '../middleware/validator.js';
 import { createUrlLimiter, passwordLimiter } from '../middleware/rateLimiter.js';
-import { optionalAuthenticate } from '../middleware/auth.js';
+import { optionalAuthenticate, protectCsrf } from '../middleware/auth.js';
 
 const router = Router();
 
 // Automatically attach user identity if authenticated
 router.use(optionalAuthenticate);
 
-// Bulk operations
-router.post('/bulk-delete', urlController.bulkDelete);
-router.post('/bulk-status', urlController.bulkStatus);
+// Bulk operations (protected against CSRF)
+router.post('/bulk-delete', protectCsrf, urlController.bulkDelete);
+router.post('/bulk-status', protectCsrf, urlController.bulkStatus);
 
 // Password verification
 router.post('/:code/verify', passwordLimiter, urlController.verifyPassword);
@@ -29,9 +29,9 @@ router.get('/code/:code', urlController.getByCode);
 
 // Standard CRUD
 router.get('/', urlController.list);
-router.post('/', createUrlLimiter, validateBody(createUrlSchema), urlController.create);
+router.post('/', createUrlLimiter, protectCsrf, validateBody(createUrlSchema), urlController.create);
 router.get('/:id', urlController.getOne);
-router.patch('/:id', validateBody(updateUrlSchema), urlController.update);
-router.delete('/:id', urlController.remove);
+router.patch('/:id', protectCsrf, validateBody(updateUrlSchema), urlController.update);
+router.delete('/:id', protectCsrf, urlController.remove);
 
 export default router;

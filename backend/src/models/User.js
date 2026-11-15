@@ -80,6 +80,8 @@ const userSchema = new mongoose.Schema(
   }
 );
 
+userSchema.index({ 'refreshTokens.tokenId': 1 });
+
 // Method to verify candidate password
 userSchema.methods.comparePassword = async function (candidatePassword) {
   if (!this.passwordHash) return false;

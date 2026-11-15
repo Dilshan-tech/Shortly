@@ -113,6 +113,8 @@ urlSchema.pre('save', function () {
 // Compound indexes for fast filtered lookups, ownership queries, and sorting
 urlSchema.index({ createdAt: -1 });
 urlSchema.index({ ownerId: 1, createdAt: -1 });
+urlSchema.index({ ownerId: 1, clicks: -1 });
+urlSchema.index({ clicks: -1 });
 urlSchema.index({ isActive: 1, expiresAt: 1, clickLimit: 1 });
 urlSchema.index({ title: 'text', longUrl: 'text', code: 'text' });
 

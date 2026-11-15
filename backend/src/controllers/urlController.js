@@ -3,9 +3,11 @@ import { urlService } from '../services/urlService.js';
 export const urlController = {
   async create(req, res, next) {
     try {
-      const ownerId = req.user?.id || req.body.ownerId || null;
+      // Security: ownerId must only come from verified authenticated session, never untrusted client body
+      const ownerId = req.user?.id || null;
+      const { ownerId: _ignored, ...sanitizedBody } = req.body;
       const result = await urlService.createShortUrl({
-        ...req.body,
+        ...sanitizedBody,
         ownerId
       });
       res.status(201).json({
@@ -20,7 +22,8 @@ export const urlController = {
   async list(req, res, next) {
     try {
       const { search, status, sortBy, sortOrder, page, limit } = req.query;
-      const ownerId = req.user ? req.user.id : (req.query.ownerId || null);
+      // Security: strictly scope to authenticated user id, ignoring client-supplied ownerId query
+      const ownerId = req.user ? req.user.id : null;
 
       const result = await urlService.getAllUrls({
         search,
@@ -120,7 +123,7 @@ export const urlController = {
   async bulkDelete(req, res, next) {
     try {
       const { ids } = req.body;
-      const result = await urlService.bulkDelete(ids);
+      const result = await urlService.bulkDelete(ids, req.user);
       res.json({
         success: true,
         message: `Deleted ${result.count} links`,
@@ -134,7 +137,7 @@ export const urlController = {
   async bulkStatus(req, res, next) {
     try {
       const { ids, isActive } = req.body;
-      const result = await urlService.bulkStatus(ids, isActive);
+      const result = await urlService.bulkStatus(ids, isActive, req.user);
       res.json({
         success: true,
         message: `Updated status for ${result.count} links`,
